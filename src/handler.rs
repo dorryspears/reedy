@@ -1,5 +1,6 @@
 use crate::app::{App, AppResult, InputMode, PageMode};
 use crossterm::event::{KeyCode, KeyEvent};
+use log::{debug, error};
 
 /// Handles the key events and updates the state of [`App`].
 pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
@@ -25,6 +26,28 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                     app.select_feed(index).await?;
                 }
             }
+            KeyCode::Char('r') => {
+                app.toggle_read_status();
+            }
+            KeyCode::Char('R') => {
+                app.mark_all_as_read();
+            }
+            KeyCode::PageUp => {
+                app.scroll_up();
+            }
+            KeyCode::PageDown => {
+                app.scroll_down();
+            }
+            KeyCode::Char('c') => {
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        if let Err(e) = app.refresh_all_feeds().await {
+                            error!("Failed to refresh feeds: {}", e);
+                            app.error_message = Some(format!("Failed to refresh feeds: {}", e));
+                        }
+                    });
+                });
+            }
             _ => {}
         },
         PageMode::FeedManager => match app.input_mode {
@@ -33,6 +56,7 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                     app.quit();
                 }
                 KeyCode::Char('m') => {
+                    debug!("Are we logging?");
                     app.toggle_feed_manager();
                 }
                 KeyCode::Char('a') => {
@@ -41,6 +65,13 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 KeyCode::Char('d') => {
                     app.start_deleting();
                 }
+                KeyCode::Char('c') => {
+                    tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(async {
+                            app.cache_all_feeds().await;
+                        });
+                    });
+                },
                 KeyCode::Enter => {
                     if let Some(index) = app.selected_index {
                         app.select_feed(index).await?;
@@ -55,6 +86,18 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 }
                 KeyCode::Down => {
                     app.select_next();
+                }
+                KeyCode::Char('r') => {
+                    app.mark_as_read();
+                }
+                KeyCode::Char('R') => {
+                    app.mark_all_as_read();
+                }
+                KeyCode::PageUp => {
+                    app.scroll_up();
+                }
+                KeyCode::PageDown => {
+                    app.scroll_down();
                 }
                 _ => {}
             },

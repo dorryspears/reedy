@@ -8,6 +8,7 @@ use ratatui::{
 };
 
 use crate::app::{App, InputMode, PageMode};
+use chrono::{DateTime, Local};
 
 /// Renders the user interface widgets.
 pub fn render(app: &App, frame: &mut Frame) {
@@ -22,7 +23,7 @@ pub fn render(app: &App, frame: &mut Frame) {
 
     // Title bar
     let title = match app.page_mode {
-        PageMode::FeedList => "RSS Reader",
+        PageMode::FeedList => "Reedy",
         PageMode::FeedManager => "Feed Manager",
     };
 
@@ -40,9 +41,9 @@ pub fn render(app: &App, frame: &mut Frame) {
     let status_text = match app.page_mode {
         PageMode::FeedList => {
             if app.current_feed_content.is_empty() {
-                "[m] Manage Feeds  [q] Quit".to_string()
+                "[m] Manage Feeds  [c] Refresh Cache  [q] Quit".to_string()
             } else {
-                "[↑↓] Navigate  [o] Open in Browser  [m] Manage Feeds  [q] Quit".to_string()
+                "[↑↓] Navigate  [o] Open in Browser  [m] Manage Feeds  [c] Refresh Cache  [r] Mark as Read  [R] Mark All as Read  [q] Quit".to_string()
             }
         }
         PageMode::FeedManager => match app.input_mode {
@@ -64,23 +65,44 @@ pub fn render(app: &App, frame: &mut Frame) {
 }
 
 fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
+    let height = area.height as usize;
     let items: Vec<ListItem> = app
         .current_feed_content
         .iter()
         .enumerate()
+        .skip(app.scroll as usize)
+        .take(height)
         .map(|(i, item)| {
             let style = if Some(i) == app.selected_index {
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::REVERSED)
+            } else if app.is_item_read(item) {
+                Style::default().fg(Color::DarkGray)
             } else {
                 Style::default().fg(Color::White)
             };
 
+            let date_str = item.published.map_or_else(
+                || "No date".to_string(),
+                |date| {
+                    let datetime: DateTime<Local> = date.into();
+                    datetime.format("%Y-%m-%d %H:%M").to_string()
+                },
+            );
+
             ListItem::new(vec![
                 Line::from(vec![
                     Span::styled(format!("{}. ", i + 1), style),
+                    Span::styled(
+                        format!("[{}] ", if app.is_item_read(item) { "✓" } else { " " }),
+                        style,
+                    ),
                     Span::styled(&item.title, style.add_modifier(Modifier::BOLD)),
+                ]),
+                Line::from(vec![
+                    Span::raw("   "),
+                    Span::styled(date_str, Style::default().fg(Color::Yellow)),
                 ]),
                 Line::from(vec![
                     Span::raw("   "),
@@ -91,12 +113,30 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
         .collect();
 
     let list = List::new(items)
-        .block(Block::default().title("Feed Content").borders(Borders::ALL))
+        .block(
+            Block::default()
+                .title(format!(
+                    "Feed Content ({}/{})",
+                    app.scroll + 1,
+                    app.current_feed_content.len()
+                ))
+                .borders(Borders::ALL),
+        )
         .style(Style::default().fg(Color::White));
     frame.render_widget(list, area);
 }
 
 fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
+    // Create a layout that splits the area vertically for the list and error message
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(3),    // Feed list takes most space
+            Constraint::Length(1), // Status line
+        ])
+        .split(area);
+
+    // Render the feed list
     let items: Vec<ListItem> = app
         .rss_feeds
         .iter()
@@ -121,5 +161,15 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
     let list = List::new(items)
         .block(Block::default().title("RSS Feeds").borders(Borders::ALL))
         .style(Style::default().fg(Color::White));
-    frame.render_widget(list, area);
+    frame.render_widget(list, chunks[0]);
+
+    // Render error message if present
+    if let Some(error) = &app.error_message {
+        let error_text = Line::from(vec![
+            Span::styled("Error: ", Style::default().fg(Color::Red)),
+            Span::styled(error, Style::default().fg(Color::Red)),
+        ]);
+        let paragraph = Paragraph::new(error_text).style(Style::default().fg(Color::Red));
+        frame.render_widget(paragraph, chunks[1]);
+    }
 }
