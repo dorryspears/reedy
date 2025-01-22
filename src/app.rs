@@ -68,6 +68,7 @@ impl Default for App {
             input_mode: InputMode::Normal,
             page_mode: PageMode::FeedList,
             input_buffer: String::new(),
+            //The rss feed urls
             rss_feeds: Vec::new(),
             selected_index: None,
             current_feed_content: Vec::new(),
@@ -91,16 +92,25 @@ impl App {
             app.error_message = Some(format!("Failed to load feeds: {}", e));
         });
 
-        // Cache all feeds in the background
+        // Cache all feeds in the background and load all cached content
         if !app.rss_feeds.is_empty() {
             app.selected_index = Some(0);
             tokio::task::block_in_place(|| {
                 tokio::runtime::Handle::current().block_on(async {
+                    let _ = app.refresh_all_feeds().await;
                     app.cache_all_feeds().await;
-                    if let Err(e) = app.load_feed_content().await {
-                        error!("Failed to load initial feed content: {}", e);
-                        app.error_message = Some(format!("Failed to load feed content: {}", e));
+
+                    // Load and combine all cached feed content
+                    let mut all_items = Vec::new();
+                    for url in &app.rss_feeds {
+                        if let Some(cached_items) = app.load_feed_cache(url) {
+                            all_items.extend(cached_items);
+                        }
                     }
+
+                    // Sort all items by date, newest first
+                    all_items.sort_by(|a, b| b.published.cmp(&a.published));
+                    app.current_feed_content = all_items;
                 });
             });
         }
@@ -540,6 +550,25 @@ impl App {
         None
     }
 
+    /// Caches content from all configured RSS/Atom feeds.
+    ///
+    /// This method iterates through all feed URLs and:
+    /// - Checks if a valid cache already exists for each feed
+    /// - Skips feeds that are already cached
+    /// - Fetches and parses new content for uncached feeds
+    /// - Attempts to parse feeds as both RSS and Atom formats
+    /// - Stores the parsed content in the local cache
+    ///
+    /// The cached content includes feed items with their titles, descriptions,
+    /// links, and publication dates. Cache entries are stored in the application's
+    /// cache directory with base64-encoded URLs as filenames.
+    ///
+    /// # Errors
+    ///
+    /// While this method doesn't return errors, it logs error messages when:
+    /// - Network requests fail
+    /// - Feed parsing fails
+    /// - Cache operations fail
     pub async fn cache_all_feeds(&mut self) {
         for url in self.rss_feeds.clone() {
             debug!("Checking cache for URL: {}", url);
@@ -581,6 +610,21 @@ impl App {
         }
     }
 
+    /// Refreshes all RSS/Atom feeds by fetching their latest content.
+    ///
+    /// This method:
+    /// - Fetches the latest content from all configured feed URLs
+    /// - Parses both RSS and Atom feed formats
+    /// - Caches the fetched content for each feed
+    /// - Combines all feed items into a single sorted list
+    /// - Updates the application's current feed content
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Network requests fail
+    /// - Feed parsing fails
+    /// - Cache operations fail
     pub async fn refresh_all_feeds(&mut self) -> AppResult<()> {
         let mut all_items = Vec::new();
 
