@@ -15,10 +15,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             KeyCode::Char('o') => {
                 app.open_selected_feed();
             }
-            KeyCode::Up => {
+            KeyCode::Up | KeyCode::Char('k') => {
                 app.select_previous();
             }
-            KeyCode::Down => {
+            KeyCode::Down | KeyCode::Char('j') => {
                 app.select_next();
             }
             KeyCode::Enter => {
@@ -71,7 +71,7 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                             app.cache_all_feeds().await;
                         });
                     });
-                },
+                }
                 KeyCode::Enter => {
                     if let Some(index) = app.selected_index {
                         app.select_feed(index).await?;
@@ -81,12 +81,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                         }
                     }
                 }
-                KeyCode::Up => {
+                KeyCode::Up | KeyCode::Char('k') => {
                     app.select_previous();
                 }
-                KeyCode::Down => {
-                    app.select_next();
-                }
+                KeyCode::Down | KeyCode::Char('j') => app.select_next(),
                 KeyCode::Char('r') => {
                     app.mark_as_read();
                 }
