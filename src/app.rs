@@ -222,15 +222,6 @@ impl App {
                 self.page_mode = PageMode::FeedList;
                 // Reset selection and trigger refresh
                 self.selected_index = Some(0);
-                // Using block_in_place because we can't use .await directly
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        if let Err(e) = self.refresh_all_feeds().await {
-                            error!("Failed to refresh feeds: {}", e);
-                            self.error_message = Some(format!("Failed to refresh feeds: {}", e));
-                        }
-                    });
-                });
             }
         }
     }
