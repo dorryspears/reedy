@@ -43,7 +43,7 @@ pub fn render(app: &App, frame: &mut Frame) {
             if app.current_feed_content.is_empty() {
                 "[m] Manage Feeds  [c] Refresh Cache  [q] Quit".to_string()
             } else {
-                "[↑↓] Navigate  [o] Open in Browser  [m] Manage Feeds  [c] Refresh Cache  [r] Mark as Read  [R] Mark All as Read  [q] Quit".to_string()
+                "[↑↓] Navigate  [o] Open in Browser  [m] Manage Feeds  [c] Refresh Cache  [r] Mark as Read  [R] Mark All as Read  [f] Toggle Favorite  [q] Quit".to_string()
             }
         }
         PageMode::FeedManager => match app.input_mode {
@@ -83,6 +83,12 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
                 Style::default().fg(Color::White)
             };
 
+            let favorite_indicator = if app.is_item_favorite(item) {
+                "★ "
+            } else {
+                "  "
+            };
+
             let date_str = item.published.map_or_else(
                 || "No date".to_string(),
                 |date| {
@@ -93,7 +99,7 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
 
             ListItem::new(vec![
                 Line::from(vec![
-                    Span::styled(format!("{}. ", i + 1), style),
+                    Span::styled(format!("{}", favorite_indicator), style),
                     Span::styled(
                         format!("[{}] ", if app.is_item_read(item) { "✓" } else { " " }),
                         style,

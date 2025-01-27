@@ -48,6 +48,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                     });
                 });
             }
+            KeyCode::Char('f') => {
+                app.toggle_favorite();
+            }
             _ => {}
         },
         PageMode::FeedManager => match app.input_mode {

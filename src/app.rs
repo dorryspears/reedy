@@ -37,6 +37,7 @@ pub struct FeedItem {
 struct SavedState {
     feeds: Vec<String>,
     read_items: HashSet<String>,
+    favorites: HashSet<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -58,6 +59,7 @@ pub struct App {
     pub error_message: Option<String>,
     save_path: PathBuf,
     read_items: HashSet<String>,
+    favorites: HashSet<String>,
     pub scroll: u16,
 }
 
@@ -68,13 +70,13 @@ impl Default for App {
             input_mode: InputMode::Normal,
             page_mode: PageMode::FeedList,
             input_buffer: String::new(),
-            //The rss feed urls
             rss_feeds: Vec::new(),
             selected_index: None,
             current_feed_content: Vec::new(),
             error_message: None,
             save_path: Self::get_save_path(),
             read_items: HashSet::new(),
+            favorites: HashSet::new(),
             scroll: 0,
         }
     }
@@ -185,13 +187,15 @@ impl App {
         let saved = SavedState {
             feeds: self.rss_feeds.clone(),
             read_items: self.read_items.clone(),
+            favorites: self.favorites.clone(),
         };
         let content = serde_json::to_string_pretty(&saved)?;
         fs::write(&self.save_path, content)?;
         debug!(
-            "Saved {} feeds and {} read items to {}",
+            "Saved {} feeds, {} read items, and {} favorites to {}",
             self.rss_feeds.len(),
             self.read_items.len(),
+            self.favorites.len(),
             self.save_path.display()
         );
         Ok(())
@@ -200,14 +204,40 @@ impl App {
     fn load_feeds(&mut self) -> AppResult<()> {
         if self.save_path.exists() {
             let content = fs::read_to_string(&self.save_path)?;
-            let saved: SavedState = serde_json::from_str(&content)?;
-            self.rss_feeds = saved.feeds;
-            self.read_items = saved.read_items;
-            debug!(
-                "Loaded {} feeds from {}",
-                self.rss_feeds.len(),
-                self.save_path.display()
-            );
+            
+            // Try to parse with new format first
+            match serde_json::from_str::<SavedState>(&content) {
+                Ok(saved) => {
+                    self.rss_feeds = saved.feeds;
+                    self.read_items = saved.read_items;
+                    self.favorites = saved.favorites;
+                    debug!(
+                        "Loaded {} feeds and {} favorites from {}",
+                        self.rss_feeds.len(),
+                        self.favorites.len(),
+                        self.save_path.display()
+                    );
+                }
+                Err(_) => {
+                    // Try parsing old format (without favorites)
+                    #[derive(Debug, Serialize, Deserialize)]
+                    struct OldSavedState {
+                        feeds: Vec<String>,
+                        read_items: HashSet<String>,
+                    }
+
+                    if let Ok(old_saved) = serde_json::from_str::<OldSavedState>(&content) {
+                        self.rss_feeds = old_saved.feeds;
+                        self.read_items = old_saved.read_items;
+                        self.favorites = HashSet::new();  // Initialize empty favorites
+                        debug!(
+                            "Loaded {} feeds from old format state file {}",
+                            self.rss_feeds.len(),
+                            self.save_path.display()
+                        );
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -455,13 +485,15 @@ impl App {
         let saved = SavedState {
             feeds: self.rss_feeds.clone(),
             read_items: self.read_items.clone(),
+            favorites: self.favorites.clone(),
         };
         let content = serde_json::to_string_pretty(&saved)?;
         fs::write(&self.save_path, content)?;
         debug!(
-            "Saved {} feeds and {} read items to {}",
+            "Saved {} feeds, {} read items, and {} favorites to {}",
             self.rss_feeds.len(),
             self.read_items.len(),
+            self.favorites.len(),
             self.save_path.display()
         );
         Ok(())
@@ -693,6 +725,27 @@ impl App {
             }
             if let Err(e) = fs::create_dir_all(&cache_dir) {
                 error!("Failed to recreate cache directory: {}", e);
+            }
+        }
+    }
+
+    pub fn is_item_favorite(&self, item: &FeedItem) -> bool {
+        self.favorites.contains(&item.id)
+    }
+
+    pub fn toggle_favorite(&mut self) {
+        if let Some(index) = self.selected_index {
+            if let Some(item) = self.current_feed_content.get(index) {
+                if self.favorites.contains(&item.id) {
+                    self.favorites.remove(&item.id);
+                    debug!("Removed item from favorites: {}", item.title);
+                } else {
+                    self.favorites.insert(item.id.clone());
+                    debug!("Added item to favorites: {}", item.title);
+                }
+                self.save_state().unwrap_or_else(|e| {
+                    error!("Failed to save favorites: {}", e);
+                });
             }
         }
     }
