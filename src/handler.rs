@@ -127,10 +127,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 KeyCode::Esc => {
                     app.cancel_deleting();
                 }
-                KeyCode::Up => {
+                KeyCode::Up | KeyCode::Char('k') => {
                     app.select_previous();
                 }
-                KeyCode::Down => {
+                KeyCode::Down | KeyCode::Char('j') => {
                     app.select_next();
                 }
                 _ => {}
