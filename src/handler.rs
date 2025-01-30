@@ -51,6 +51,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             KeyCode::Char('f') => {
                 app.toggle_favorite();
             }
+            KeyCode::Char('F') => {
+                app.toggle_favorites_page();
+            }
             _ => {}
         },
         PageMode::FeedManager => match app.input_mode {
@@ -135,6 +138,33 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 }
                 _ => {}
             },
+            _ => {}
+        },
+        PageMode::Favorites => match key_event.code {
+            KeyCode::Char('q') | KeyCode::Esc => {
+                app.quit();
+            }
+            KeyCode::Char('o') => {
+                app.open_selected_feed();
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.select_previous();
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.select_next();
+            }
+            KeyCode::Char('f') => {
+                app.toggle_favorite();
+            }
+            KeyCode::Char('F') => {
+                app.toggle_favorites_page();
+            }
+            KeyCode::PageUp => {
+                app.scroll_up();
+            }
+            KeyCode::PageDown => {
+                app.scroll_down();
+            }
             _ => {}
         },
     }

@@ -22,6 +22,7 @@ pub enum InputMode {
 pub enum PageMode {
     FeedList,
     FeedManager,
+    Favorites,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -253,13 +254,17 @@ impl App {
                 // Reset selection and trigger refresh
                 self.selected_index = Some(0);
             }
+            PageMode::Favorites => {
+                self.page_mode = PageMode::FeedManager;
+                self.selected_index = Some(0);
+            }
         }
     }
 
     pub fn select_previous(&mut self) {
         if let Some(current) = self.selected_index {
             let len = match self.page_mode {
-                PageMode::FeedList => self.current_feed_content.len(),
+                PageMode::FeedList | PageMode::Favorites => self.current_feed_content.len(),
                 PageMode::FeedManager => self.rss_feeds.len(),
             };
             self.selected_index = Some(if current > 0 { current - 1 } else { len - 1 });
@@ -269,7 +274,7 @@ impl App {
     pub fn select_next(&mut self) {
         if let Some(current) = self.selected_index {
             let len = match self.page_mode {
-                PageMode::FeedList => self.current_feed_content.len(),
+                PageMode::FeedList | PageMode::Favorites => self.current_feed_content.len(),
                 PageMode::FeedManager => self.rss_feeds.len(),
             };
             self.selected_index = Some((current + 1) % len);
@@ -521,7 +526,7 @@ impl App {
 
     pub fn scroll_down(&mut self) {
         let max_scroll = match self.page_mode {
-            PageMode::FeedList => self.current_feed_content.len(),
+            PageMode::FeedList | PageMode::Favorites => self.current_feed_content.len(),
             PageMode::FeedManager => self.rss_feeds.len(),
         };
         if (self.scroll as usize) < max_scroll.saturating_sub(1) {
@@ -746,6 +751,49 @@ impl App {
                 self.save_state().unwrap_or_else(|e| {
                     error!("Failed to save favorites: {}", e);
                 });
+            }
+        }
+    }
+
+    pub fn toggle_favorites_page(&mut self) {
+        match self.page_mode {
+            PageMode::Favorites => {
+                self.page_mode = PageMode::FeedList;
+                // Reset selection and reload all feeds like at startup
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let _ = self.refresh_all_feeds().await;
+                        self.cache_all_feeds().await;
+
+                        // Load and combine all cached feed content
+                        let mut all_items = Vec::new();
+                        for url in &self.rss_feeds {
+                            if let Some(cached_items) = self.load_feed_cache(url) {
+                                all_items.extend(cached_items);
+                            }
+                        }
+
+                        // Sort all items by date, newest first
+                        all_items.sort_by(|a, b| b.published.cmp(&a.published));
+                        self.current_feed_content = all_items;
+                    });
+                });
+                self.selected_index = Some(0);
+            }
+            _ => {
+                self.page_mode = PageMode::Favorites;
+                // Filter current feed content to show only favorites
+                let favorites: Vec<FeedItem> = self.current_feed_content
+                    .iter()
+                    .filter(|item| self.favorites.contains(&item.id))
+                    .cloned()
+                    .collect();
+                self.current_feed_content = favorites;
+                self.selected_index = if self.current_feed_content.is_empty() {
+                    None
+                } else {
+                    Some(0)
+                };
             }
         }
     }

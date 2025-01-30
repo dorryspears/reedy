@@ -25,6 +25,7 @@ pub fn render(app: &App, frame: &mut Frame) {
     let title = match app.page_mode {
         PageMode::FeedList => "Reedy",
         PageMode::FeedManager => "Feed Manager",
+        PageMode::Favorites => "Favorites",
     };
 
     let title = Paragraph::new(title)
@@ -35,15 +36,24 @@ pub fn render(app: &App, frame: &mut Frame) {
     match app.page_mode {
         PageMode::FeedList => render_feed_content(app, frame, chunks[1]),
         PageMode::FeedManager => render_feed_manager(app, frame, chunks[1]),
+        PageMode::Favorites => render_feed_content(app, frame, chunks[1]),
     }
 
     // Status bar
+    // TODO: ? button to show more
     let status_text = match app.page_mode {
         PageMode::FeedList => {
             if app.current_feed_content.is_empty() {
-                "[m] Manage Feeds  [c] Refresh Cache  [q] Quit".to_string()
+                "[m] Manage Feeds  [c] Refresh Cache  [F] Favorites  [q] Quit".to_string()
             } else {
-                "[↑↓] Navigate  [o] Open in Browser  [m] Manage Feeds  [c] Refresh Cache  [r] Mark as Read  [R] Mark All as Read  [f] Toggle Favorite  [q] Quit".to_string()
+                "[↑↓] Navigate  [o] Open in Browser  [m] Manage Feeds  [c] Refresh Cache  [r] Mark as Read  [R] Mark All as Read  [f] Toggle Favorite  [F] Favorites  [q] Quit".to_string()
+            }
+        }
+        PageMode::Favorites => {
+            if app.current_feed_content.is_empty() {
+                "[F] Back to Feeds  [q] Quit".to_string()
+            } else {
+                "[↑↓] Navigate  [o] Open in Browser  [f] Toggle Favorite  [F] Back to Feeds  [q] Quit".to_string()
             }
         }
         PageMode::FeedManager => match app.input_mode {
