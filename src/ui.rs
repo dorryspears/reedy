@@ -40,7 +40,7 @@ pub fn render(app: &App, frame: &mut Frame) {
     }
 
     // Status bar
-    // TODO: ? button to show more
+    // TODO: ? button to show more yes
     let status_text = match app.page_mode {
         PageMode::FeedList => {
             if app.current_feed_content.is_empty() {
