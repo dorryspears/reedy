@@ -6,4 +6,4 @@ Reedy is a super fast rss feed aggregator TUI (Terminal User Interface)
 
 `cargo build --release`
 
-## Let me know what you think!
+## Let me know what you think! yes
