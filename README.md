@@ -1,4 +1,4 @@
-# Reedy
+# Reedy CLI
 
 Reedy is a super fast rss feed aggregator TUI (Terminal User Interface)
 
