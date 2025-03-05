@@ -53,6 +53,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             KeyCode::PageDown => {
                 app.page_down();
             }
+            KeyCode::Char('g') => {
+                app.scroll_to_top();
+            }
             KeyCode::Char('c') => {
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(async {
@@ -128,6 +131,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 KeyCode::PageDown => {
                     app.scroll_down();
                 }
+                KeyCode::Char('g') => {
+                    app.scroll_to_top();
+                }
                 KeyCode::Char('?') => {
                     app.toggle_help();
                 }
@@ -198,6 +204,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             }
             KeyCode::PageDown => {
                 app.page_down();
+            }
+            KeyCode::Char('g') => {
+                app.scroll_to_top();
             }
             KeyCode::Char('?') => {
                 app.toggle_help();

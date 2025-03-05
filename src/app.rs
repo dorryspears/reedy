@@ -634,6 +634,25 @@ impl App {
             }
         }
     }
+    
+    /// Scrolls to the top of the feed and selects the first item
+    pub fn scroll_to_top(&mut self) {
+        self.scroll = 0;
+        
+        // Select the first item if there are any items
+        match self.page_mode {
+            PageMode::FeedList | PageMode::Favorites => {
+                if !self.current_feed_content.is_empty() {
+                    self.selected_index = Some(0);
+                }
+            },
+            PageMode::FeedManager => {
+                if !self.rss_feeds.is_empty() {
+                    self.selected_index = Some(0);
+                }
+            },
+        }
+    }
 
     fn get_cache_dir() -> PathBuf {
         let mut path = dirs::cache_dir().unwrap_or_else(|| PathBuf::from("."));

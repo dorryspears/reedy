@@ -53,19 +53,19 @@ pub fn render(app: &App, frame: &mut Frame) {
                 if app.current_feed_content.is_empty() {
                     "[m] Manage Feeds  [c] Refresh Cache  [F] Favorites  [?] Help  [q] Quit".to_string()
                 } else {
-                    "[↑↓] Navigate  [o] Open in Browser  [m] Manage Feeds  [c] Refresh Cache  [r] Mark as Read  [R] Mark All as Read  [f] Toggle Favorite  [F] Favorites  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [g] Top  [o] Open in Browser  [m] Manage Feeds  [c] Refresh Cache  [r] Mark as Read  [R] Mark All as Read  [f] Toggle Favorite  [F] Favorites  [?] Help  [q] Quit".to_string()
                 }
             }
             PageMode::Favorites => {
                 if app.current_feed_content.is_empty() {
                     "[F] Back to Feeds  [?] Help  [q] Quit".to_string()
                 } else {
-                    "[↑↓] Navigate  [o] Open in Browser  [f] Toggle Favorite  [F] Back to Feeds  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [g] Top  [o] Open in Browser  [f] Toggle Favorite  [F] Back to Feeds  [?] Help  [q] Quit".to_string()
                 }
             }
             PageMode::FeedManager => match app.input_mode {
                 InputMode::Normal => {
-                    "[a] Add Feed  [d] Delete Feed  [m] Back to Feeds  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [g] Top  [a] Add Feed  [d] Delete Feed  [m] Back to Feeds  [?] Help  [q] Quit".to_string()
                 }
                 InputMode::Adding => format!("Enter RSS URL: {}", app.input_buffer),
                 InputMode::Deleting => {
@@ -238,6 +238,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
             ]),
             Line::from("↑/k, ↓/j      - Navigate between feed items"),
             Line::from("PgUp, PgDown   - Scroll page up/down"),
+            Line::from("g              - Scroll to top of feed"),
             Line::from("Enter          - Read selected feed"),
             Line::from(""),
             Line::from(vec![
@@ -262,6 +263,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
                 Span::styled("Navigation", Style::default().add_modifier(Modifier::UNDERLINED).fg(Color::Yellow))
             ]),
             Line::from("↑/k, ↓/j      - Navigate between feeds"),
+            Line::from("g              - Scroll to top of feed list"),
             Line::from("Enter          - Select feed and return to feed list"),
             Line::from(""),
             Line::from(vec![
@@ -284,6 +286,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
             ]),
             Line::from("↑/k, ↓/j      - Navigate between favorite items"),
             Line::from("PgUp, PgDown   - Scroll page up/down"),
+            Line::from("g              - Scroll to top of feed"),
             Line::from(""),
             Line::from(vec![
                 Span::styled("Actions", Style::default().add_modifier(Modifier::UNDERLINED).fg(Color::Yellow))
