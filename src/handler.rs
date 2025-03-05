@@ -4,6 +4,17 @@ use log::{debug, error};
 
 /// Handles the key events and updates the state of [`App`].
 pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
+    // Handle help mode across all pages first
+    if app.input_mode == InputMode::Help {
+        match key_event.code {
+            KeyCode::Char('q') | KeyCode::Esc | KeyCode::Char('?') => {
+                app.toggle_help();
+                return Ok(());
+            }
+            _ => return Ok(()),
+        }
+    }
+
     match app.page_mode {
         PageMode::FeedList => match key_event.code {
             KeyCode::Char('q') | KeyCode::Esc => {
@@ -17,9 +28,13 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 app.select_previous();
+                // Using our centralized method to ensure selection is visible
+                app.ensure_selection_visible();
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 app.select_next();
+                // Using our centralized method to ensure selection is visible
+                app.ensure_selection_visible();
             }
             KeyCode::Enter => {
                 if let Some(index) = app.selected_index {
@@ -33,10 +48,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 app.mark_all_as_read();
             }
             KeyCode::PageUp => {
-                app.scroll_up();
+                app.page_up();
             }
             KeyCode::PageDown => {
-                app.scroll_down();
+                app.page_down();
             }
             KeyCode::Char('c') => {
                 tokio::task::block_in_place(|| {
@@ -53,6 +68,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             }
             KeyCode::Char('F') => {
                 app.toggle_favorites_page();
+            }
+            KeyCode::Char('?') => {
+                app.toggle_help();
             }
             _ => {}
         },
@@ -84,13 +102,20 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                         app.toggle_feed_manager();
                         if !app.current_feed_content.is_empty() {
                             app.selected_index = Some(0);
+                            app.scroll = 0; // Reset scroll position
                         }
                     }
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
                     app.select_previous();
+                    // Ensure selected item is visible
+                    app.ensure_selection_visible();
                 }
-                KeyCode::Down | KeyCode::Char('j') => app.select_next(),
+                KeyCode::Down | KeyCode::Char('j') => {
+                    app.select_next();
+                    // Ensure selected item is visible
+                    app.ensure_selection_visible();
+                },
                 KeyCode::Char('r') => {
                     app.mark_as_read();
                 }
@@ -102,6 +127,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 }
                 KeyCode::PageDown => {
                     app.scroll_down();
+                }
+                KeyCode::Char('?') => {
+                    app.toggle_help();
                 }
                 _ => {}
             },
@@ -132,9 +160,11 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 }
                 KeyCode::Up | KeyCode::Char('k') => {
                     app.select_previous();
+                    app.ensure_selection_visible();
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
                     app.select_next();
+                    app.ensure_selection_visible();
                 }
                 _ => {}
             },
@@ -149,9 +179,13 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             }
             KeyCode::Up | KeyCode::Char('k') => {
                 app.select_previous();
+                // Using our centralized method to ensure selection is visible
+                app.ensure_selection_visible();
             }
             KeyCode::Down | KeyCode::Char('j') => {
                 app.select_next();
+                // Using our centralized method to ensure selection is visible
+                app.ensure_selection_visible();
             }
             KeyCode::Char('f') => {
                 app.toggle_favorite();
@@ -160,10 +194,13 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 app.toggle_favorites_page();
             }
             KeyCode::PageUp => {
-                app.scroll_up();
+                app.page_up();
             }
             KeyCode::PageDown => {
-                app.scroll_down();
+                app.page_down();
+            }
+            KeyCode::Char('?') => {
+                app.toggle_help();
             }
             _ => {}
         },
