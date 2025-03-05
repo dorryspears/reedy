@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout},
     prelude::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},
@@ -21,17 +21,48 @@ pub fn render(app: &App, frame: &mut Frame) {
         ])
         .split(frame.area());
 
-    // Title bar
-    let title = match app.page_mode {
+    // Title bar with pixelated book
+    let title_text = match app.page_mode {
         PageMode::FeedList => "Reedy",
         PageMode::FeedManager => "Feed Manager",
         PageMode::Favorites => "Favorites",
     };
-
-    let title = Paragraph::new(title)
+    
+    // Create a layout for the title area to position the book icon and title text
+    let title_layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(35),  // Left space
+            Constraint::Percentage(30),  // Center for book
+            Constraint::Percentage(35),  // Right space
+        ])
+        .split(chunks[0]);
+    
+    // Pixelated book ASCII art
+    let book_art = vec![
+        Line::from("  ┌─────┐ "),
+        Line::from(" ┌│░░░░░│┐"),
+        Line::from("┌││░░░░░││┐"),
+        Line::from("││└─────┘││"),
+        Line::from("└└───────┘┘"),
+    ];
+    
+    let book_para = Paragraph::new(book_art)
         .style(Style::default().fg(Color::Green))
-        .block(Block::default().borders(Borders::ALL));
-    frame.render_widget(title, chunks[0]);
+        .alignment(Alignment::Center);
+    
+    let title_para = Paragraph::new(title_text)
+        .style(Style::default().fg(Color::Green))
+        .alignment(Alignment::Center);
+        
+    // Render the title block with border
+    let title_block = Block::default().borders(Borders::ALL);
+    frame.render_widget(title_block, chunks[0]);
+    
+    // Render book and title text inside the block
+    frame.render_widget(book_para, title_layout[1]);
+    frame.render_widget(title_para.clone(), title_layout[0]);
+    frame.render_widget(title_para, title_layout[2]);
 
     // If we're in help mode, render the help menu instead of the regular content
     if app.input_mode == InputMode::Help {
