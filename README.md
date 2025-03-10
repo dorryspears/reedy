@@ -15,6 +15,15 @@ Reedy is a terminal-based RSS feed reader with a clean interface built with Rust
 
 ## Installation
 
+### Option 1: Install from cargo
+
+```bash
+# Install directly from crates.io
+cargo install reedy
+```
+
+### Option 2: Build from source
+
 ```bash
 # Clone the repository
 git clone https://github.com/USERNAME/reedy.git
