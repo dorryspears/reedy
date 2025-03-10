@@ -1518,7 +1518,7 @@ dependencies = [
 
 [[package]]
 name = "reedy"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "atom_syndication",
  "base64",

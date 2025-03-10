@@ -6,8 +6,36 @@ on:
       - 'v*'
 
 jobs:
+  check_branch:
+    name: Check if tag is on main branch
+    runs-on: ubuntu-latest
+    outputs:
+      tag_on_main: ${{ steps.check_branch.outputs.tag_on_main }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history and tags
+      
+      - name: Check if on main branch
+        id: check_branch
+        shell: bash
+        run: |
+          # Get the branch that the tag is on
+          TAG_BRANCH=$(git branch -r --contains ${{ github.ref }} | grep -v "HEAD" | head -n 1 | xargs)
+          echo "Tag is on branch: $TAG_BRANCH"
+          
+          # Only proceed if the tag is on main
+          if [[ "$TAG_BRANCH" == *"main" ]]; then
+            echo "tag_on_main=true" >> $GITHUB_OUTPUT
+          else
+            echo "tag_on_main=false" >> $GITHUB_OUTPUT
+            echo "Tag is not on main branch, skipping release"
+          fi
+  
   build:
     name: Build and Release
+    needs: check_branch
+    if: needs.check_branch.outputs.tag_on_main == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
@@ -25,40 +53,50 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0  # Fetch all history and tags
-      
-      - name: Check if on main branch
-        id: check_branch
+
+      - name: Install dependencies (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
         run: |
-          # Get the branch that the tag is on
-          TAG_BRANCH=$(git branch -r --contains ${{ github.ref }} | grep -v "HEAD" | head -n 1 | xargs)
-          echo "Tag is on branch: $TAG_BRANCH"
-          
-          # Only proceed if the tag is on main
-          if [[ "$TAG_BRANCH" == *"main" ]]; then
-            echo "tag_on_main=true" >> $GITHUB_OUTPUT
-          else
-            echo "tag_on_main=false" >> $GITHUB_OUTPUT
-            echo "Tag is not on main branch, skipping release"
-          fi
+          sudo apt-get update
+          sudo apt-get install -y libssl-dev pkg-config
+
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install openssl
 
       - name: Setup Rust
-        if: steps.check_branch.outputs.tag_on_main == 'true'
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
 
+      - name: Run CI preparation (non-Windows)
+        if: matrix.os != 'windows-latest' && hashFiles('scripts/ci-prep.sh') != ''
+        shell: bash
+        run: |
+          chmod +x scripts/ci-prep.sh
+          ./scripts/ci-prep.sh
+
+      - name: Run CI preparation (Windows)
+        if: matrix.os == 'windows-latest' && hashFiles('scripts/ci-prep.sh') != ''
+        shell: bash
+        run: |
+          sh scripts/ci-prep.sh
+
       - name: Build
-        if: steps.check_branch.outputs.tag_on_main == 'true'
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --release
 
+      # Wait a bit to ensure the GitHub release is created by the publish workflow
+      - name: Wait for release creation
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        run: sleep 15
+          
       - name: Upload binaries to release
-        if: steps.check_branch.outputs.tag_on_main == 'true'
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
