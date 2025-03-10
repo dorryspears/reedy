@@ -1,6 +1,6 @@
 # Reedy - A TUI RSS Feed Reader
 
-![Rust CI](https://github.com/USERNAME/reedy/workflows/Rust%20CI/badge.svg)
+![Rust CI](https://github.com/dorryspears/reedy/workflows/Rust%20CI/badge.svg)
 
 Reedy is a terminal-based RSS feed reader with a clean interface built with Rust and Ratatui.
 
