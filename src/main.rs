@@ -1,10 +1,10 @@
-use std::io;
-use std::env;
 use dotenv::dotenv;
 use env_logger::Builder;
-use log::LevelFilter;
-use std::fs::File;
 use env_logger::Target;
+use log::LevelFilter;
+use std::env;
+use std::fs::File;
+use std::io;
 
 use ratatui::{backend::CrosstermBackend, Terminal};
 
@@ -32,7 +32,7 @@ async fn main() -> AppResult<()> {
         let log_path = App::get_log_path();
         println!("Log file location: {}", log_path.display());
         let file = File::create(log_path).unwrap();
-        
+
         Builder::new()
             .target(Target::Pipe(Box::new(file)))
             .filter_level(LevelFilter::Debug)
@@ -57,7 +57,7 @@ async fn main() -> AppResult<()> {
         match tui.events.next().await? {
             Event::Tick => app.tick(),
             Event::Key(key_event) => handle_key_events(key_event, &mut app).await?,
-            Event::Mouse(_) => {},
+            Event::Mouse(_) => {}
             Event::Resize(width, height) => {
                 app.terminal_width = width;
                 app.terminal_height = height;

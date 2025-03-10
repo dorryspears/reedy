@@ -27,17 +27,17 @@ pub fn render(app: &App, frame: &mut Frame) {
         PageMode::FeedManager => "Feed Manager",
         PageMode::Favorites => "Favorites",
     };
-    
+
     // Create a layout for the title area to position the book icon and title text
     let title_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Percentage(35),  // Left space
-            Constraint::Percentage(30),  // Center for book
-            Constraint::Percentage(35),  // Right space
+            Constraint::Percentage(35), // Left space
+            Constraint::Percentage(30), // Center for book
+            Constraint::Percentage(35), // Right space
         ])
         .split(chunks[0]);
-    
+
     // Pixelated book ASCII art
     let book_art = vec![
         Line::from("   ┌─────┐  "),
@@ -46,19 +46,19 @@ pub fn render(app: &App, frame: &mut Frame) {
         Line::from(" ││└─────┘││"),
         Line::from(" └└───────┘┘"),
     ];
-    
+
     let book_para = Paragraph::new(book_art)
         .style(Style::default().fg(Color::Green))
         .alignment(Alignment::Center);
-    
+
     let title_para = Paragraph::new(title_text)
         .style(Style::default().fg(Color::Green))
         .alignment(Alignment::Center);
-        
+
     // Render the title block with border
     let title_block = Block::default().borders(Borders::ALL);
     frame.render_widget(title_block, chunks[0]);
-    
+
     // Render book and title text inside the block
     frame.render_widget(book_para, title_layout[1]);
     frame.render_widget(title_para.clone(), title_layout[0]);
@@ -83,11 +83,11 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
     // Calculate how many items can fit per page (each item takes 3 lines plus a separator)
     let items_per_page = ((area.height as usize).saturating_sub(2) / 3).max(1); // Ensure at least 1 item per page
     let total_items = app.current_feed_content.len();
-    
+
     // Calculate the visible range for items
     let start_idx = app.scroll as usize;
     let end_idx = (start_idx + items_per_page).min(total_items);
-    
+
     let items: Vec<ListItem> = app
         .current_feed_content
         .iter()
@@ -122,14 +122,14 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
             // Calculate max width for title and description
             let title_max_width = area.width.saturating_sub(10) as usize; // Account for favorite icon, read status and spacing
             let desc_max_width = area.width.saturating_sub(6) as usize; // Account for indentation and borders
-            
+
             // Truncate title and description
             let truncated_title = truncate_text(&item.title, title_max_width as u16);
             let truncated_desc = truncate_text(&item.description, desc_max_width as u16);
 
             ListItem::new(vec![
                 Line::from(vec![
-                    Span::styled(format!("{}", favorite_indicator), style),
+                    Span::styled(favorite_indicator, style),
                     Span::styled(
                         format!("[{}] ", if app.is_item_read(item) { "✓" } else { " " }),
                         style,
@@ -152,9 +152,10 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
     let page_count = if total_items == 0 {
         1
     } else {
-        (total_items + items_per_page - 1) / items_per_page
+        // Ceiling division
+        total_items.div_ceil(items_per_page)
     };
-    
+
     let current_page = if total_items == 0 {
         1
     } else {
@@ -233,25 +234,34 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
 /// Renders the help menu with all available commands based on the current page mode
 fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
     let title = "Help - Available Commands";
-    
+
     // Create the help text based on the current page mode
     let help_text = match app.page_mode {
         PageMode::FeedList => vec![
-            Line::from(vec![
-                Span::styled("Feed List Commands", Style::default().add_modifier(Modifier::BOLD).fg(Color::Green))
-            ]),
+            Line::from(vec![Span::styled(
+                "Feed List Commands",
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .fg(Color::Green),
+            )]),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("Navigation", Style::default().add_modifier(Modifier::UNDERLINED).fg(Color::Yellow))
-            ]),
+            Line::from(vec![Span::styled(
+                "Navigation",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(Color::Yellow),
+            )]),
             Line::from("↑/k, ↓/j      - Navigate between feed items"),
             Line::from("PgUp, PgDown   - Scroll page up/down"),
             Line::from("g              - Scroll to top of feed"),
             Line::from("Enter          - Read selected feed"),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("Actions", Style::default().add_modifier(Modifier::UNDERLINED).fg(Color::Yellow))
-            ]),
+            Line::from(vec![Span::styled(
+                "Actions",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(Color::Yellow),
+            )]),
             Line::from("o              - Open selected item in browser"),
             Line::from("r              - Toggle read status of selected item"),
             Line::from("R              - Mark all items as read"),
@@ -263,20 +273,29 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
             Line::from("q/Esc          - Quit application"),
         ],
         PageMode::FeedManager => vec![
-            Line::from(vec![
-                Span::styled("Feed Manager Commands", Style::default().add_modifier(Modifier::BOLD).fg(Color::Green))
-            ]),
+            Line::from(vec![Span::styled(
+                "Feed Manager Commands",
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .fg(Color::Green),
+            )]),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("Navigation", Style::default().add_modifier(Modifier::UNDERLINED).fg(Color::Yellow))
-            ]),
+            Line::from(vec![Span::styled(
+                "Navigation",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(Color::Yellow),
+            )]),
             Line::from("↑/k, ↓/j      - Navigate between feeds"),
             Line::from("g              - Scroll to top of feed list"),
             Line::from("Enter          - Select feed and return to feed list"),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("Actions", Style::default().add_modifier(Modifier::UNDERLINED).fg(Color::Yellow))
-            ]),
+            Line::from(vec![Span::styled(
+                "Actions",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(Color::Yellow),
+            )]),
             Line::from("a              - Add new feed"),
             Line::from("d              - Delete selected feed"),
             Line::from("c              - Refresh feed cache"),
@@ -285,20 +304,29 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
             Line::from("q/Esc          - Quit application"),
         ],
         PageMode::Favorites => vec![
-            Line::from(vec![
-                Span::styled("Favorites View Commands", Style::default().add_modifier(Modifier::BOLD).fg(Color::Green))
-            ]),
+            Line::from(vec![Span::styled(
+                "Favorites View Commands",
+                Style::default()
+                    .add_modifier(Modifier::BOLD)
+                    .fg(Color::Green),
+            )]),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("Navigation", Style::default().add_modifier(Modifier::UNDERLINED).fg(Color::Yellow))
-            ]),
+            Line::from(vec![Span::styled(
+                "Navigation",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(Color::Yellow),
+            )]),
             Line::from("↑/k, ↓/j      - Navigate between favorite items"),
             Line::from("PgUp, PgDown   - Scroll page up/down"),
             Line::from("g              - Scroll to top of feed"),
             Line::from(""),
-            Line::from(vec![
-                Span::styled("Actions", Style::default().add_modifier(Modifier::UNDERLINED).fg(Color::Yellow))
-            ]),
+            Line::from(vec![Span::styled(
+                "Actions",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(Color::Yellow),
+            )]),
             Line::from("o              - Open selected item in browser"),
             Line::from("f              - Remove item from favorites"),
             Line::from("F              - Return to all feeds view"),
@@ -306,11 +334,11 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
             Line::from("q/Esc          - Quit application"),
         ],
     };
-    
+
     let help_paragraph = Paragraph::new(help_text)
         .block(Block::default().title(title).borders(Borders::ALL))
         .style(Style::default().fg(Color::White));
-    
+
     frame.render_widget(help_paragraph, area);
 }
 
@@ -319,7 +347,10 @@ pub fn truncate_text(text: &str, max_width: u16) -> String {
     if text.len() <= max_width as usize {
         text.to_string()
     } else {
-        let mut truncated = text.chars().take((max_width - 3) as usize).collect::<String>();
+        let mut truncated = text
+            .chars()
+            .take((max_width - 3) as usize)
+            .collect::<String>();
         truncated.push_str("...");
         truncated
     }
@@ -357,14 +388,14 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
             },
         }
     };
-    
+
     // Truncate the commands to fit in the available width
     let truncated_commands = truncate_text(&commands, area.width.saturating_sub(2));
-    
+
     let command_bar = Paragraph::new(truncated_commands)
         .style(Style::default().fg(Color::Yellow))
         .block(Block::default().borders(Borders::ALL))
         .alignment(Alignment::Left);
-    
+
     frame.render_widget(command_bar, area);
 }

@@ -118,7 +118,7 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                     app.select_next();
                     // Ensure selected item is visible
                     app.ensure_selection_visible();
-                },
+                }
                 KeyCode::Char('r') => {
                     app.mark_as_read();
                 }

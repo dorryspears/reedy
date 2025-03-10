@@ -1,10 +1,10 @@
-use reedy::app::{App, InputMode, PageMode, FeedItem};
+use reedy::app::{App, FeedItem, InputMode, PageMode};
 use std::time::SystemTime;
 
 #[test]
 fn test_app_default() {
     let app = App::default();
-    assert_eq!(app.running, true);
+    assert!(app.running);
     assert_eq!(app.input_mode, InputMode::Normal);
     assert_eq!(app.page_mode, PageMode::FeedList);
     assert_eq!(app.input_buffer, "");
@@ -21,7 +21,7 @@ fn test_app_toggle_feed_manager() {
     app.page_mode = PageMode::FeedList;
     app.toggle_feed_manager();
     assert_eq!(app.page_mode, PageMode::FeedManager);
-    
+
     app.toggle_feed_manager();
     assert_eq!(app.page_mode, PageMode::FeedList);
 }
@@ -30,10 +30,10 @@ fn test_app_toggle_feed_manager() {
 fn test_app_toggle_help() {
     let mut app = App::default();
     assert_eq!(app.input_mode, InputMode::Normal);
-    
+
     app.toggle_help();
     assert_eq!(app.input_mode, InputMode::Help);
-    
+
     app.toggle_help();
     assert_eq!(app.input_mode, InputMode::Normal);
 }
@@ -48,11 +48,11 @@ fn test_app_item_favorite() {
         published: Some(SystemTime::now()),
         id: "test-id".to_string(),
     };
-    
+
     // Initially not a favorite
-    assert_eq!(app.is_item_favorite(&item), false);
-    
+    assert!(!app.is_item_favorite(&item));
+
     // Add to favorites manually (bypassing toggle_favorite which requires selected_index)
     app.favorites.insert(item.id.clone());
-    assert_eq!(app.is_item_favorite(&item), true);
-} 
+    assert!(app.is_item_favorite(&item));
+}

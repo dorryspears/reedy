@@ -158,7 +158,7 @@ impl RssManager {
     fn load_feeds(&mut self) -> RssResult<()> {
         if self.save_path.exists() {
             let content = fs::read_to_string(&self.save_path)?;
-            
+
             // Try to parse with new format first
             match serde_json::from_str::<SavedState>(&content) {
                 Ok(saved) => {
@@ -183,7 +183,7 @@ impl RssManager {
                     if let Ok(old_saved) = serde_json::from_str::<OldSavedState>(&content) {
                         self.rss_feeds = old_saved.feeds;
                         self.read_items = old_saved.read_items;
-                        self.favorites = HashSet::new();  // Initialize empty favorites
+                        self.favorites = HashSet::new(); // Initialize empty favorites
                         debug!(
                             "Loaded {} feeds from old format state file {}",
                             self.rss_feeds.len(),
@@ -382,19 +382,19 @@ impl RssManager {
 
     pub async fn get_all_feed_items(&mut self) -> Vec<FeedItem> {
         let mut all_items = Vec::new();
-        
+
         // Try to load from cache first
         for url in &self.rss_feeds {
             if let Some(cached_items) = self.load_feed_cache(url) {
                 all_items.extend(cached_items);
             }
         }
-        
+
         // If no cached items were found, refresh feeds
         if all_items.is_empty() {
             let _ = self.refresh_all_feeds().await;
         }
-        
+
         // Sort all items by date, newest first
         all_items.sort_by(|a, b| b.published.cmp(&a.published));
         all_items

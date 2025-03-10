@@ -34,4 +34,4 @@ fn test_truncate_text_unicode() {
     // Unicode characters are counted properly
     assert!(result.len() <= (max_width as usize + 3)); // +3 for ellipsis
     assert!(result.ends_with("..."));
-} 
+}

@@ -1,13 +1,13 @@
 use atom_syndication::Feed as AtomFeed;
 use base64;
 use chrono::DateTime;
+use crossterm::terminal;
 use html2text;
 use log::{debug, error, info};
 use reqwest;
 use rss::Channel;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, error, fs, path::PathBuf, time::SystemTime};
-use crossterm::terminal;
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
@@ -92,7 +92,7 @@ impl Default for App {
 impl App {
     pub fn new() -> Self {
         let mut app = Self::default();
-        
+
         // Get initial terminal size
         if let Ok((width, height)) = terminal::size() {
             app.terminal_width = width;
@@ -217,7 +217,7 @@ impl App {
     fn load_feeds(&mut self) -> AppResult<()> {
         if self.save_path.exists() {
             let content = fs::read_to_string(&self.save_path)?;
-            
+
             // Try to parse with new format first
             match serde_json::from_str::<SavedState>(&content) {
                 Ok(saved) => {
@@ -242,7 +242,7 @@ impl App {
                     if let Ok(old_saved) = serde_json::from_str::<OldSavedState>(&content) {
                         self.rss_feeds = old_saved.feeds;
                         self.read_items = old_saved.read_items;
-                        self.favorites = HashSet::new();  // Initialize empty favorites
+                        self.favorites = HashSet::new(); // Initialize empty favorites
                         debug!(
                             "Loaded {} feeds from old format state file {}",
                             self.rss_feeds.len(),
@@ -297,7 +297,7 @@ impl App {
             self.ensure_selection_visible();
         }
     }
-    
+
     /// Ensures that the currently selected item is visible in the view
     pub fn ensure_selection_visible(&mut self) {
         if let Some(index) = self.selected_index {
@@ -305,13 +305,13 @@ impl App {
             if (index as u16) < self.scroll {
                 self.scroll = index as u16;
             }
-            
+
             // Calculate the number of visible items in the current view
             let items_per_page = match self.page_mode {
                 PageMode::FeedList | PageMode::Favorites => 5, // Approximately 5 items per page
-                PageMode::FeedManager => 10, // Approximately 10 items per page
+                PageMode::FeedManager => 10,                   // Approximately 10 items per page
             };
-            
+
             // Make sure selection is not below the visible area
             if index >= (self.scroll as usize + items_per_page) {
                 self.scroll = (index - items_per_page + 1) as u16;
@@ -329,7 +329,7 @@ impl App {
         self.input_buffer.clear();
         self.clear_error();
     }
-    
+
     pub fn toggle_help(&mut self) {
         match self.input_mode {
             InputMode::Help => self.input_mode = InputMode::Normal,
@@ -577,31 +577,31 @@ impl App {
                 } else {
                     self.current_feed_content.len().saturating_sub(1)
                 }
-            },
+            }
             PageMode::FeedManager => {
                 if self.rss_feeds.is_empty() {
                     0
                 } else {
                     self.rss_feeds.len().saturating_sub(1)
                 }
-            },
+            }
         };
-        
+
         if (self.scroll as usize) < max_scroll {
             self.scroll += 1;
         }
     }
-    
+
     pub fn page_up(&mut self) {
         // Calculate approximate items per page
         let page_size = match self.page_mode {
             PageMode::FeedList | PageMode::Favorites => 5, // Approximately 5 items per page
-            PageMode::FeedManager => 10, // Approximately 10 items per page
+            PageMode::FeedManager => 10,                   // Approximately 10 items per page
         };
-        
+
         // Scroll up by page size
         self.scroll = self.scroll.saturating_sub(page_size);
-        
+
         // Update selection to follow scrolling
         if let Some(index) = self.selected_index {
             if (index as u16) >= self.scroll + page_size {
@@ -609,59 +609,47 @@ impl App {
             }
         }
     }
-    
+
     pub fn page_down(&mut self) {
-        // Calculate approximate items per page
-        let page_size = match self.page_mode {
-            PageMode::FeedList | PageMode::Favorites => 5, // Approximately 5 items per page
-            PageMode::FeedManager => 10, // Approximately 10 items per page
+        let available_height = self.terminal_height as usize;
+        let page_size = (available_height / 3).max(1);
+
+        // Calculate maximum possible scroll value
+        let max_scroll = if self.current_feed_content.is_empty() {
+            0
+        } else {
+            (self.current_feed_content.len() - 1).saturating_sub(available_height / 3)
         };
-        
-        let max_scroll = match self.page_mode {
-            PageMode::FeedList | PageMode::Favorites => {
-                if self.current_feed_content.is_empty() {
-                    0
-                } else {
-                    self.current_feed_content.len().saturating_sub(1)
-                }
-            },
-            PageMode::FeedManager => {
-                if self.rss_feeds.is_empty() {
-                    0
-                } else {
-                    self.rss_feeds.len().saturating_sub(1)
-                }
-            },
-        };
-        
-        // Calculate new scroll position
-        let new_scroll = (self.scroll as usize + page_size).min(max_scroll as usize);
+
+        // Calculate new scroll position, capped at maximum scroll
+        let new_scroll = (self.scroll as usize + page_size).min(max_scroll);
+
         self.scroll = new_scroll as u16;
-        
-        // Update selection to follow scrolling
+
+        // If the selected index is now above the visible area, update it
         if let Some(index) = self.selected_index {
-            if index < (new_scroll as usize) {
-                self.selected_index = Some(new_scroll as usize);
+            if index < new_scroll {
+                self.selected_index = Some(new_scroll);
             }
         }
     }
-    
+
     /// Scrolls to the top of the feed and selects the first item
     pub fn scroll_to_top(&mut self) {
         self.scroll = 0;
-        
+
         // Select the first item if there are any items
         match self.page_mode {
             PageMode::FeedList | PageMode::Favorites => {
                 if !self.current_feed_content.is_empty() {
                     self.selected_index = Some(0);
                 }
-            },
+            }
             PageMode::FeedManager => {
                 if !self.rss_feeds.is_empty() {
                     self.selected_index = Some(0);
                 }
-            },
+            }
         }
     }
 
@@ -892,7 +880,7 @@ impl App {
                 self.page_mode = PageMode::FeedList;
                 // Reset scroll position
                 self.scroll = 0;
-                
+
                 // Reset selection and reload all feeds like at startup
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(async {
@@ -918,9 +906,10 @@ impl App {
                 self.page_mode = PageMode::Favorites;
                 // Reset scroll position
                 self.scroll = 0;
-                
+
                 // Filter current feed content to show only favorites
-                let favorites: Vec<FeedItem> = self.current_feed_content
+                let favorites: Vec<FeedItem> = self
+                    .current_feed_content
                     .iter()
                     .filter(|item| self.favorites.contains(&item.id))
                     .cloned()
