@@ -5,6 +5,14 @@ authors = ["Ryan Spears <73195765+dorryspears@users.noreply.github.com>"]
 license = "MIT"
 edition = "2021"
 
+[lib]
+name = "reedy"
+path = "src/lib.rs"
+
+[[bin]]
+name = "reedy"
+path = "src/main.rs"
+
 [dependencies]
 crossterm = { version = "0.28.1", features = ["event-stream"] }
 futures = "0.3.31"

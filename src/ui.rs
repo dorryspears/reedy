@@ -40,11 +40,11 @@ pub fn render(app: &App, frame: &mut Frame) {
     
     // Pixelated book ASCII art
     let book_art = vec![
-        Line::from("  ┌─────┐ "),
-        Line::from(" ┌│░░░░░│┐"),
-        Line::from("┌││░░░░░││┐"),
-        Line::from("││└─────┘││"),
-        Line::from("└└───────┘┘"),
+        Line::from("   ┌─────┐  "),
+        Line::from("  ┌│░░░░░│┐ "),
+        Line::from(" ┌││░░░░░││┐"),
+        Line::from(" ││└─────┘││"),
+        Line::from(" └└───────┘┘"),
     ];
     
     let book_para = Paragraph::new(book_art)
@@ -75,48 +75,13 @@ pub fn render(app: &App, frame: &mut Frame) {
         }
     }
 
-    // Status bar
-    let status_text = if app.input_mode == InputMode::Help {
-        "[q/Esc/?] Exit Help".to_string()
-    } else {
-        match app.page_mode {
-            PageMode::FeedList => {
-                if app.current_feed_content.is_empty() {
-                    "[m] Manage Feeds  [c] Refresh Cache  [F] Favorites  [?] Help  [q] Quit".to_string()
-                } else {
-                    "[↑↓] Navigate  [g] Top  [o] Open in Browser  [m] Manage Feeds  [c] Refresh Cache  [r] Mark as Read  [R] Mark All as Read  [f] Toggle Favorite  [F] Favorites  [?] Help  [q] Quit".to_string()
-                }
-            }
-            PageMode::Favorites => {
-                if app.current_feed_content.is_empty() {
-                    "[F] Back to Feeds  [?] Help  [q] Quit".to_string()
-                } else {
-                    "[↑↓] Navigate  [g] Top  [o] Open in Browser  [f] Toggle Favorite  [F] Back to Feeds  [?] Help  [q] Quit".to_string()
-                }
-            }
-            PageMode::FeedManager => match app.input_mode {
-                InputMode::Normal => {
-                    "[↑↓] Navigate  [g] Top  [a] Add Feed  [d] Delete Feed  [m] Back to Feeds  [?] Help  [q] Quit".to_string()
-                }
-                InputMode::Adding => format!("Enter RSS URL: {}", app.input_buffer),
-                InputMode::Deleting => {
-                    "Use ↑↓ to select feed, Enter to delete, Esc to cancel".to_string()
-                }
-                InputMode::FeedManager => "[m] Back to Feeds  [?] Help".to_string(),
-                InputMode::Help => unreachable!(), // This case is already handled above
-            },
-        }
-    };
-
-    let status = Paragraph::new(status_text)
-        .style(Style::default().fg(Color::Yellow))
-        .block(Block::default().borders(Borders::ALL));
-    frame.render_widget(status, chunks[2]);
+    // Render the command bar with our new function
+    render_command_bar(app, frame, chunks[2]);
 }
 
 fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
     // Calculate how many items can fit per page (each item takes 3 lines plus a separator)
-    let items_per_page = (area.height as usize).saturating_sub(2) / 3;
+    let items_per_page = ((area.height as usize).saturating_sub(2) / 3).max(1); // Ensure at least 1 item per page
     let total_items = app.current_feed_content.len();
     
     // Calculate the visible range for items
@@ -154,6 +119,14 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
                 },
             );
 
+            // Calculate max width for title and description
+            let title_max_width = area.width.saturating_sub(10) as usize; // Account for favorite icon, read status and spacing
+            let desc_max_width = area.width.saturating_sub(6) as usize; // Account for indentation and borders
+            
+            // Truncate title and description
+            let truncated_title = truncate_text(&item.title, title_max_width as u16);
+            let truncated_desc = truncate_text(&item.description, desc_max_width as u16);
+
             ListItem::new(vec![
                 Line::from(vec![
                     Span::styled(format!("{}", favorite_indicator), style),
@@ -161,7 +134,7 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
                         format!("[{}] ", if app.is_item_read(item) { "✓" } else { " " }),
                         style,
                     ),
-                    Span::styled(&item.title, style.add_modifier(Modifier::BOLD)),
+                    Span::styled(truncated_title, style.add_modifier(Modifier::BOLD)),
                 ]),
                 Line::from(vec![
                     Span::raw("   "),
@@ -169,7 +142,7 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
                 ]),
                 Line::from(vec![
                     Span::raw("   "),
-                    Span::styled(&item.description, Style::default().fg(Color::Gray)),
+                    Span::styled(truncated_desc, Style::default().fg(Color::Gray)),
                 ]),
             ])
         })
@@ -229,9 +202,13 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
                 Style::default().fg(Color::White)
             };
 
+            // Calculate max width for URL
+            let url_max_width = chunks[0].width.saturating_sub(8) as usize; // Account for index and spacing
+            let truncated_url = truncate_text(url, url_max_width as u16);
+
             ListItem::new(Line::from(vec![
                 Span::raw(format!("{}. ", i + 1)),
-                Span::raw(url),
+                Span::raw(truncated_url),
             ]))
             .style(style)
         })
@@ -335,4 +312,59 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
         .style(Style::default().fg(Color::White));
     
     frame.render_widget(help_paragraph, area);
+}
+
+/// Truncates text to fit within a specified width, adding ellipsis if necessary
+pub fn truncate_text(text: &str, max_width: u16) -> String {
+    if text.len() <= max_width as usize {
+        text.to_string()
+    } else {
+        let mut truncated = text.chars().take((max_width - 3) as usize).collect::<String>();
+        truncated.push_str("...");
+        truncated
+    }
+}
+
+fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
+    let commands = if app.input_mode == InputMode::Help {
+        "[q/Esc/?] Exit Help".to_string()
+    } else {
+        match app.page_mode {
+            PageMode::FeedList => {
+                if app.current_feed_content.is_empty() {
+                    "[m] Manage Feeds  [c] Refresh Cache  [F] Favorites  [?] Help  [q] Quit".to_string()
+                } else {
+                    "[↑↓] Navigate  [g] Top  [o] Open in Browser  [m] Manage Feeds  [c] Refresh Cache  [r] Mark as Read  [R] Mark All as Read  [f] Toggle Favorite  [F] Favorites  [?] Help  [q] Quit".to_string()
+                }
+            }
+            PageMode::Favorites => {
+                if app.current_feed_content.is_empty() {
+                    "[F] Back to Feeds  [?] Help  [q] Quit".to_string()
+                } else {
+                    "[↑↓] Navigate  [g] Top  [o] Open in Browser  [f] Toggle Favorite  [F] Back to Feeds  [?] Help  [q] Quit".to_string()
+                }
+            }
+            PageMode::FeedManager => match app.input_mode {
+                InputMode::Normal => {
+                    "[↑↓] Navigate  [g] Top  [a] Add Feed  [d] Delete Feed  [m] Back to Feeds  [?] Help  [q] Quit".to_string()
+                }
+                InputMode::Adding => format!("Enter RSS URL: {}", app.input_buffer),
+                InputMode::Deleting => {
+                    "Use ↑↓ to select feed, Enter to delete, Esc to cancel".to_string()
+                }
+                InputMode::FeedManager => "[m] Back to Feeds  [?] Help".to_string(),
+                InputMode::Help => unreachable!(), // This case is already handled above
+            },
+        }
+    };
+    
+    // Truncate the commands to fit in the available width
+    let truncated_commands = truncate_text(&commands, area.width.saturating_sub(2));
+    
+    let command_bar = Paragraph::new(truncated_commands)
+        .style(Style::default().fg(Color::Yellow))
+        .block(Block::default().borders(Borders::ALL))
+        .alignment(Alignment::Left);
+    
+    frame.render_widget(command_bar, area);
 }

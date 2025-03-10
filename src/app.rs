@@ -7,6 +7,7 @@ use reqwest;
 use rss::Channel;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, error, fs, path::PathBuf, time::SystemTime};
+use crossterm::terminal;
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
@@ -61,8 +62,10 @@ pub struct App {
     pub error_message: Option<String>,
     save_path: PathBuf,
     read_items: HashSet<String>,
-    favorites: HashSet<String>,
+    pub favorites: HashSet<String>,
     pub scroll: u16,
+    pub terminal_width: u16,
+    pub terminal_height: u16,
 }
 
 impl Default for App {
@@ -80,6 +83,8 @@ impl Default for App {
             read_items: HashSet::new(),
             favorites: HashSet::new(),
             scroll: 0,
+            terminal_width: 80,
+            terminal_height: 24,
         }
     }
 }
@@ -87,6 +92,12 @@ impl Default for App {
 impl App {
     pub fn new() -> Self {
         let mut app = Self::default();
+        
+        // Get initial terminal size
+        if let Ok((width, height)) = terminal::size() {
+            app.terminal_width = width;
+            app.terminal_height = height;
+        }
 
         // Clear the cache directory on startup
         Self::clear_cache_dir();
