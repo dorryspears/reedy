@@ -1,6 +1,6 @@
 [package]
 name = "reedy"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Ryan Spears <73195765+dorryspears@users.noreply.github.com>"]
 license = "MIT"
 edition = "2021"
