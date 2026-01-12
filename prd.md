@@ -346,9 +346,21 @@ https://news.site.com/atom.xml
 - HTML content is converted to plain text for readability
 - Configurable via `keybindings.export_article` in config.json
 
-#### 16. Feed Health Indicators
+#### ~~16. Feed Health Indicators~~ DONE
 **Description:** Visual indicators showing feed status (healthy, slow, broken, last updated).
 **Value:** Helps users identify and remove problematic feeds.
+
+**Implementation:**
+- Added `FeedStatus` enum with four states: `Healthy`, `Slow`, `Broken`, `Unknown`
+- Added `FeedHealth` struct to track per-feed health data: status, last success time, response time, error message, consecutive failures
+- Feed health is tracked during `refresh_all_feeds()` by measuring response times and detecting parse/network errors
+- Health indicators displayed in Feed Manager next to each feed:
+  - `●` (green) - Healthy: feed responded in under 5 seconds
+  - `◐` (yellow) - Slow: feed responded but took longer than 5 seconds
+  - `✗` (red) - Broken: feed failed to load or parse
+  - `○` (gray) - Unknown: feed has not been checked yet
+- Status bar in Feed Manager shows detailed health info for selected feed (e.g., "OK (250ms)" or "Error: Connection timeout")
+- Consecutive failure tracking helps identify persistently problematic feeds
 
 #### 17. Notification Support
 **Description:** Desktop notifications for new articles in subscribed feeds.

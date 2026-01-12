@@ -10,7 +10,7 @@ use reqwest;
 use rss::Channel;
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
-use std::{collections::HashSet, error, fs, path::PathBuf, time::Duration, time::SystemTime};
+use std::{collections::HashMap, collections::HashSet, error, fs, path::PathBuf, time::Duration, time::SystemTime};
 
 /// Default HTTP request timeout in seconds
 const DEFAULT_HTTP_TIMEOUT_SECS: u64 = 30;
@@ -394,6 +394,86 @@ pub struct FeedInfo {
     pub category: Option<String>,
 }
 
+/// Feed health status
+#[derive(Debug, Clone, PartialEq)]
+pub enum FeedStatus {
+    /// Feed is healthy and responding normally
+    Healthy,
+    /// Feed responded but took longer than expected (>5 seconds)
+    Slow,
+    /// Feed failed to load or parse
+    Broken,
+    /// Feed has not been checked yet
+    Unknown,
+}
+
+/// Tracks the health status of a feed
+#[derive(Debug, Clone)]
+pub struct FeedHealth {
+    /// Current status of the feed
+    pub status: FeedStatus,
+    /// Time of the last successful fetch
+    pub last_success: Option<SystemTime>,
+    /// Response time of the last fetch attempt (in milliseconds)
+    pub last_response_time_ms: Option<u64>,
+    /// Error message from the last failed attempt
+    pub last_error: Option<String>,
+    /// Number of consecutive failures
+    pub consecutive_failures: u32,
+}
+
+impl Default for FeedHealth {
+    fn default() -> Self {
+        Self {
+            status: FeedStatus::Unknown,
+            last_success: None,
+            last_response_time_ms: None,
+            last_error: None,
+            consecutive_failures: 0,
+        }
+    }
+}
+
+impl FeedHealth {
+    /// Returns a display string for the health status
+    pub fn status_indicator(&self) -> &'static str {
+        match self.status {
+            FeedStatus::Healthy => "●",  // Green dot
+            FeedStatus::Slow => "◐",     // Half-filled circle (slow)
+            FeedStatus::Broken => "✗",   // X mark (broken)
+            FeedStatus::Unknown => "○",   // Empty circle (unknown)
+        }
+    }
+
+    /// Returns a human-readable status description
+    pub fn status_description(&self) -> String {
+        match self.status {
+            FeedStatus::Healthy => {
+                if let Some(ms) = self.last_response_time_ms {
+                    format!("OK ({}ms)", ms)
+                } else {
+                    "OK".to_string()
+                }
+            }
+            FeedStatus::Slow => {
+                if let Some(ms) = self.last_response_time_ms {
+                    format!("Slow ({}ms)", ms)
+                } else {
+                    "Slow".to_string()
+                }
+            }
+            FeedStatus::Broken => {
+                if let Some(ref err) = self.last_error {
+                    format!("Error: {}", err)
+                } else {
+                    "Broken".to_string()
+                }
+            }
+            FeedStatus::Unknown => "Not checked".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct SavedState {
     feeds: Vec<FeedInfo>,
@@ -436,6 +516,8 @@ pub struct App {
     pub preview_scroll: u16,
     /// Buffer for vi-style command mode (e.g., :q, :w, :wq)
     pub command_buffer: String,
+    /// Health status for each feed (keyed by URL)
+    pub feed_health: HashMap<String, FeedHealth>,
 }
 
 impl Default for App {
@@ -463,6 +545,7 @@ impl Default for App {
             auto_refresh_pending: false,
             preview_scroll: 0,
             command_buffer: String::new(),
+            feed_health: HashMap::new(),
         }
     }
 }
@@ -699,6 +782,12 @@ impl App {
         } else {
             0
         }
+    }
+
+    /// Returns the health status for a given feed URL.
+    /// Returns a default Unknown status if the feed hasn't been checked yet.
+    pub fn get_feed_health(&self, url: &str) -> FeedHealth {
+        self.feed_health.get(url).cloned().unwrap_or_default()
     }
 
     pub fn toggle_read_status(&mut self) {
@@ -2214,6 +2303,7 @@ impl App {
     /// - Caches the fetched content for each feed
     /// - Combines all feed items into a single sorted list
     /// - Updates the application's current feed content
+    /// - Tracks feed health status (healthy, slow, broken)
     ///
     /// # Errors
     ///
@@ -2222,36 +2312,93 @@ impl App {
     /// - Feed parsing fails
     /// - Cache operations fail
     pub async fn refresh_all_feeds(&mut self) -> AppResult<()> {
+        use std::time::Instant;
+
         let mut all_items = Vec::new();
 
         let client = create_http_client(self.config.http_timeout_secs);
-        for feed_info in &self.rss_feeds {
+
+        // Clone feed info to avoid borrow issues
+        let feeds: Vec<FeedInfo> = self.rss_feeds.clone();
+
+        for feed_info in feeds {
             debug!("Refreshing feed: {}", feed_info.url);
+
+            // Record start time for health tracking
+            let start_time = Instant::now();
+
             match client.get(&feed_info.url).send().await {
                 Ok(response) => {
-                    let content = response.bytes().await?;
-                    // Try RSS first
-                    let feed_items = match Channel::read_from(&content[..]) {
-                        Ok(channel) => convert_rss_items(channel, &feed_info.title, &feed_info.url),
-                        Err(_) => {
-                            // Try Atom if RSS fails
-                            match AtomFeed::read_from(&content[..]) {
-                                Ok(feed) => convert_atom_items(feed, &feed_info.title, &feed_info.url),
-                                Err(_e) => {
+                    let response_time_ms = start_time.elapsed().as_millis() as u64;
+
+                    match response.bytes().await {
+                        Ok(content) => {
+                            // Try RSS first
+                            let parse_result = match Channel::read_from(&content[..]) {
+                                Ok(channel) => Some(convert_rss_items(channel, &feed_info.title, &feed_info.url)),
+                                Err(_) => {
+                                    // Try Atom if RSS fails
+                                    match AtomFeed::read_from(&content[..]) {
+                                        Ok(feed) => Some(convert_atom_items(feed, &feed_info.title, &feed_info.url)),
+                                        Err(_) => None,
+                                    }
+                                }
+                            };
+
+                            match parse_result {
+                                Some(feed_items) => {
+                                    // Save to cache
+                                    if let Err(e) = self.save_feed_cache(&feed_info.url, &feed_items) {
+                                        error!("Failed to cache feed content for {}: {}", feed_info.url, e);
+                                    }
+                                    all_items.extend(feed_items);
+
+                                    // Update health status - slow if > 5000ms, healthy otherwise
+                                    let status = if response_time_ms > 5000 {
+                                        FeedStatus::Slow
+                                    } else {
+                                        FeedStatus::Healthy
+                                    };
+
+                                    self.feed_health.insert(feed_info.url.clone(), FeedHealth {
+                                        status,
+                                        last_success: Some(SystemTime::now()),
+                                        last_response_time_ms: Some(response_time_ms),
+                                        last_error: None,
+                                        consecutive_failures: 0,
+                                    });
+                                }
+                                None => {
                                     error!("Failed to parse feed as either RSS or Atom: {}", feed_info.url);
-                                    continue;
+
+                                    // Update health status as broken (parse error)
+                                    let health = self.feed_health.entry(feed_info.url.clone()).or_default();
+                                    health.status = FeedStatus::Broken;
+                                    health.last_error = Some("Failed to parse feed".to_string());
+                                    health.last_response_time_ms = Some(response_time_ms);
+                                    health.consecutive_failures += 1;
                                 }
                             }
                         }
-                    };
-                    // Save to cache
-                    if let Err(e) = self.save_feed_cache(&feed_info.url, &feed_items) {
-                        error!("Failed to cache feed content for {}: {}", feed_info.url, e);
+                        Err(e) => {
+                            error!("Failed to read response body for {}: {}", feed_info.url, e);
+
+                            // Update health status as broken
+                            let health = self.feed_health.entry(feed_info.url.clone()).or_default();
+                            health.status = FeedStatus::Broken;
+                            health.last_error = Some(format!("Read error: {}", e));
+                            health.consecutive_failures += 1;
+                        }
                     }
-                    all_items.extend(feed_items);
                 }
                 Err(e) => {
                     error!("Failed to fetch feed {}: {}", feed_info.url, e);
+
+                    // Update health status as broken (network error)
+                    let health = self.feed_health.entry(feed_info.url.clone()).or_default();
+                    health.status = FeedStatus::Broken;
+                    health.last_error = Some(format!("{}", e));
+                    health.consecutive_failures += 1;
                 }
             }
         }

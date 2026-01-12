@@ -7,7 +7,7 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{App, InputMode, PageMode, Theme};
+use crate::app::{App, FeedStatus, InputMode, PageMode, Theme};
 use chrono::{DateTime, Local};
 
 /// Converts a color name string to a ratatui Color
@@ -335,6 +335,16 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeC
             let unread_count = app.count_unread_for_feed(&feed_info.url);
             let total_count = app.count_total_for_feed(&feed_info.url);
 
+            // Get feed health status
+            let health = app.get_feed_health(&feed_info.url);
+            let health_indicator = health.status_indicator();
+            let health_style = match health.status {
+                FeedStatus::Healthy => Style::default().fg(Color::Green),
+                FeedStatus::Slow => Style::default().fg(Color::Yellow),
+                FeedStatus::Broken => Style::default().fg(Color::Red),
+                FeedStatus::Unknown => Style::default().fg(colors.muted),
+            };
+
             // Format the count display
             let count_display = if total_count > 0 {
                 format!(" ({}/{})", unread_count, total_count)
@@ -342,9 +352,9 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeC
                 String::new()
             };
 
-            // Calculate max width for title, accounting for count display and indent
+            // Calculate max width for title, accounting for health indicator, count display and indent
             let count_len = count_display.len();
-            let title_max_width = chunks[0].width.saturating_sub(12 + count_len as u16) as usize; // Account for index, spacing, indent, and count
+            let title_max_width = chunks[0].width.saturating_sub(15 + count_len as u16) as usize; // Account for index, health, spacing, indent, and count
             let truncated_title = truncate_text(&feed_info.title, title_max_width as u16);
 
             // Style for unread count - highlight if there are unread items
@@ -356,7 +366,8 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeC
 
             items.push(
                 ListItem::new(Line::from(vec![
-                    Span::raw(format!("  {}. ", feed_index + 1)),
+                    Span::styled(format!("{} ", health_indicator), health_style),
+                    Span::raw(format!("{}. ", feed_index + 1)),
                     Span::raw(truncated_title),
                     Span::styled(count_display, count_style),
                 ]))
@@ -371,7 +382,7 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeC
         .style(Style::default().fg(colors.text));
     frame.render_widget(list, chunks[0]);
 
-    // Render error message if present
+    // Render status line: error message or selected feed health status
     if let Some(error) = &app.error_message {
         let error_text = Line::from(vec![
             Span::styled("Error: ", Style::default().fg(colors.error)),
@@ -379,6 +390,30 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeC
         ]);
         let paragraph = Paragraph::new(error_text).style(Style::default().fg(colors.error));
         frame.render_widget(paragraph, chunks[1]);
+    } else if let Some(selected_index) = app.selected_index {
+        // Show health status for selected feed
+        if let Some(feed_info) = app.rss_feeds.get(selected_index) {
+            let health = app.get_feed_health(&feed_info.url);
+            let status_color = match health.status {
+                FeedStatus::Healthy => Color::Green,
+                FeedStatus::Slow => Color::Yellow,
+                FeedStatus::Broken => Color::Red,
+                FeedStatus::Unknown => colors.muted,
+            };
+
+            let status_text = Line::from(vec![
+                Span::styled(
+                    format!("{} ", health.status_indicator()),
+                    Style::default().fg(status_color),
+                ),
+                Span::styled(
+                    health.status_description(),
+                    Style::default().fg(status_color),
+                ),
+            ]);
+            let paragraph = Paragraph::new(status_text);
+            frame.render_widget(paragraph, chunks[1]);
+        }
     }
 }
 

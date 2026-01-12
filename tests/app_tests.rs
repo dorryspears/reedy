@@ -1052,3 +1052,83 @@ fn test_keybindings_export_article_default() {
     let keybindings = reedy::app::Keybindings::default();
     assert_eq!(keybindings.export_article, "s");
 }
+
+#[test]
+fn test_feed_health_default() {
+    use reedy::app::{FeedHealth, FeedStatus};
+
+    let health = FeedHealth::default();
+    assert_eq!(health.status, FeedStatus::Unknown);
+    assert!(health.last_success.is_none());
+    assert!(health.last_response_time_ms.is_none());
+    assert!(health.last_error.is_none());
+    assert_eq!(health.consecutive_failures, 0);
+}
+
+#[test]
+fn test_feed_health_status_indicator() {
+    use reedy::app::{FeedHealth, FeedStatus};
+
+    let mut health = FeedHealth::default();
+
+    health.status = FeedStatus::Healthy;
+    assert_eq!(health.status_indicator(), "●");
+
+    health.status = FeedStatus::Slow;
+    assert_eq!(health.status_indicator(), "◐");
+
+    health.status = FeedStatus::Broken;
+    assert_eq!(health.status_indicator(), "✗");
+
+    health.status = FeedStatus::Unknown;
+    assert_eq!(health.status_indicator(), "○");
+}
+
+#[test]
+fn test_feed_health_status_description() {
+    use reedy::app::{FeedHealth, FeedStatus};
+
+    let mut health = FeedHealth::default();
+
+    // Healthy with response time
+    health.status = FeedStatus::Healthy;
+    health.last_response_time_ms = Some(250);
+    assert_eq!(health.status_description(), "OK (250ms)");
+
+    // Healthy without response time
+    health.last_response_time_ms = None;
+    assert_eq!(health.status_description(), "OK");
+
+    // Slow with response time
+    health.status = FeedStatus::Slow;
+    health.last_response_time_ms = Some(6000);
+    assert_eq!(health.status_description(), "Slow (6000ms)");
+
+    // Broken with error
+    health.status = FeedStatus::Broken;
+    health.last_error = Some("Connection timeout".to_string());
+    assert_eq!(health.status_description(), "Error: Connection timeout");
+
+    // Broken without error
+    health.last_error = None;
+    assert_eq!(health.status_description(), "Broken");
+
+    // Unknown
+    health.status = FeedStatus::Unknown;
+    assert_eq!(health.status_description(), "Not checked");
+}
+
+#[test]
+fn test_get_feed_health_unknown_url() {
+    let app = App::default();
+
+    // Unknown URL should return default (Unknown status)
+    let health = app.get_feed_health("https://unknown.example.com/feed.xml");
+    assert_eq!(health.status, reedy::app::FeedStatus::Unknown);
+}
+
+#[test]
+fn test_app_default_has_empty_feed_health() {
+    let app = App::default();
+    assert!(app.feed_health.is_empty());
+}

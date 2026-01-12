@@ -1157,3 +1157,58 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (61 total: 50 app tests, 11 ui tests)
 
+---
+
+### Implemented: Low Priority Feature #16 - Feed Health Indicators
+
+**Location:** `src/app.rs`, `src/ui.rs`
+
+**Description:** Added visual indicators showing feed status (healthy, slow, broken) in the Feed Manager. This helps users quickly identify problematic feeds that may need attention or removal.
+
+**Implementation Details:**
+
+1. **New FeedStatus enum:** Added four health states:
+   - `Healthy` - Feed responded successfully in under 5 seconds
+   - `Slow` - Feed responded but took longer than 5 seconds
+   - `Broken` - Feed failed to load or parse
+   - `Unknown` - Feed has not been checked yet
+
+2. **New FeedHealth struct:** Tracks detailed health information per feed:
+   - `status: FeedStatus` - Current health state
+   - `last_success: Option<SystemTime>` - Timestamp of last successful fetch
+   - `last_response_time_ms: Option<u64>` - Response time in milliseconds
+   - `last_error: Option<String>` - Error message from last failure
+   - `consecutive_failures: u32` - Number of consecutive failures
+
+3. **New App field:** Added `feed_health: HashMap<String, FeedHealth>` to store health data keyed by feed URL
+
+4. **Updated refresh_all_feeds():**
+   - Now measures response time for each feed using `std::time::Instant`
+   - Records health status based on response time and success/failure
+   - Tracks consecutive failures for persistently problematic feeds
+   - Feeds taking > 5000ms are marked as Slow; network/parse errors mark as Broken
+
+5. **New App method:**
+   - `get_feed_health(url: &str) -> FeedHealth` - Returns health for a feed URL (defaults to Unknown)
+
+6. **FeedHealth helper methods:**
+   - `status_indicator()` - Returns icon for status: `●` (healthy), `◐` (slow), `✗` (broken), `○` (unknown)
+   - `status_description()` - Returns human-readable status: "OK (250ms)", "Slow (6000ms)", "Error: ...", "Not checked"
+
+7. **UI Updates in Feed Manager:**
+   - Health indicator icon displayed before each feed in the list
+   - Icon color matches status: green (healthy), yellow (slow), red (broken), gray (unknown)
+   - Status bar shows detailed health info for the selected feed
+
+**Files changed:**
+- `src/app.rs` - Added `FeedStatus` enum, `FeedHealth` struct, `feed_health` field, `get_feed_health()` method, updated `refresh_all_feeds()` with health tracking
+- `src/ui.rs` - Updated `render_feed_manager()` to display health indicators and status bar
+- `tests/app_tests.rs` - Added 6 new tests:
+  - `test_feed_health_default` - verifies default FeedHealth values
+  - `test_feed_health_status_indicator` - tests icon for each status
+  - `test_feed_health_status_description` - tests description for each status
+  - `test_get_feed_health_unknown_url` - verifies default for unknown URLs
+  - `test_app_default_has_empty_feed_health` - verifies empty health map on startup
+
+**Tests:** All tests pass (66 total: 55 app tests, 11 ui tests)
+
