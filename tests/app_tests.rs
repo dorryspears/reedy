@@ -216,3 +216,47 @@ fn test_unfavorite_does_not_remove_in_feedlist_view() {
     // But it should no longer be a favorite
     assert!(!app.favorites.contains(&item.id));
 }
+
+#[test]
+fn test_items_per_page_dynamic_calculation() {
+    let mut app = App::default();
+
+    // Test with default terminal height (24)
+    // Content height = 24 - 8 = 16
+    // FeedList: 16 / 3 = 5 items
+    app.page_mode = PageMode::FeedList;
+    assert_eq!(app.items_per_page(), 5);
+
+    // FeedManager: 16 - 1 = 15 items
+    app.page_mode = PageMode::FeedManager;
+    assert_eq!(app.items_per_page(), 15);
+
+    // Test with larger terminal height (48)
+    // Content height = 48 - 8 = 40
+    app.terminal_height = 48;
+
+    // FeedList: 40 / 3 = 13 items
+    app.page_mode = PageMode::FeedList;
+    assert_eq!(app.items_per_page(), 13);
+
+    // FeedManager: 40 - 1 = 39 items
+    app.page_mode = PageMode::FeedManager;
+    assert_eq!(app.items_per_page(), 39);
+
+    // Test with very small terminal height (10) to verify minimum of 1
+    // Content height = 10 - 8 = 2
+    app.terminal_height = 10;
+
+    // FeedList: 2 / 3 = 0, but max(0, 1) = 1
+    app.page_mode = PageMode::FeedList;
+    assert_eq!(app.items_per_page(), 1);
+
+    // FeedManager: 2 - 1 = 1 item
+    app.page_mode = PageMode::FeedManager;
+    assert_eq!(app.items_per_page(), 1);
+
+    // Test Favorites mode uses same calculation as FeedList
+    app.terminal_height = 24;
+    app.page_mode = PageMode::Favorites;
+    assert_eq!(app.items_per_page(), 5);
+}

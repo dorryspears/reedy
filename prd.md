@@ -90,11 +90,13 @@ pub mod ui;
 
 **Fix:** Removed the duplicate module declarations from `main.rs`. The modules are already properly declared in `lib.rs` and exported via the `reedy` crate, which `main.rs` imports. This eliminates the redundancy and potential for confusion.
 
-#### 8. Hardcoded Page Sizes
+#### ~~8. Hardcoded Page Sizes~~ FIXED
 **Location:** `src/app.rs:311-313`, `src/app.rs:597-600`
 **Description:** Page size for scrolling uses hardcoded values (5 items for feed list, 10 for manager) instead of calculating based on actual terminal height.
 
 **Impact:** Inconsistent pagination; items may overflow or underflow the visible area.
+
+**Fix:** Added `items_per_page()` helper method that dynamically calculates visible items based on terminal height and page mode. Updated `ensure_selection_visible()`, `page_up()`, and `page_down()` to use this helper instead of hardcoded values.
 
 #### 9. Blocking Async Patterns
 **Location:** `src/app.rs:113-130`, `src/app.rs:885-902`

@@ -131,3 +131,25 @@
 - `src/main.rs` - Removed 5 redundant `pub mod` declarations
 
 **Tests:** All tests pass (16 total: 11 app tests, 5 ui tests)
+
+---
+
+### Fixed: Medium Bug #8 - Hardcoded Page Sizes
+
+**Location:** `src/app.rs:324-327`, `src/app.rs:613-616`
+
+**Problem:** Page sizes for scrolling were hardcoded to 5 items for FeedList/Favorites and 10 items for FeedManager. This meant pagination didn't adapt to the actual terminal height, causing items to overflow or underflow the visible area.
+
+**Solution:**
+1. Added a new `items_per_page()` method that dynamically calculates the number of visible items based on:
+   - Terminal height (accounting for 8 lines of UI chrome: 3 title + 3 command bar + 2 borders)
+   - Page mode (FeedList/Favorites use 3 lines per item, FeedManager uses 1 line per item)
+2. Updated `ensure_selection_visible()` to use `items_per_page()` instead of hardcoded values
+3. Updated `page_up()` to use `items_per_page()` instead of hardcoded values
+4. Updated `page_down()` to use `items_per_page()` and also fixed it to work correctly in FeedManager mode
+
+**Files changed:**
+- `src/app.rs` - Added `items_per_page()` method, updated `ensure_selection_visible()`, `page_up()`, and `page_down()`
+- `tests/app_tests.rs` - Added `test_items_per_page_dynamic_calculation` to verify the calculation works correctly for different terminal heights and page modes
+
+**Tests:** All tests pass (17 total: 12 app tests, 5 ui tests)

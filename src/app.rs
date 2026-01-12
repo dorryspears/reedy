@@ -312,6 +312,21 @@ impl App {
         }
     }
 
+    /// Calculates the number of visible items based on terminal height and page mode.
+    /// This accounts for UI chrome (title bar, command bar, borders, etc.)
+    pub fn items_per_page(&self) -> usize {
+        // Terminal layout: 3 lines title + 3 lines command bar = 6 lines of chrome
+        // Content area has 2 lines for borders
+        let content_height = self.terminal_height.saturating_sub(8) as usize;
+
+        match self.page_mode {
+            // FeedList/Favorites: each item takes 3 lines (title, description snippet, metadata)
+            PageMode::FeedList | PageMode::Favorites => (content_height / 3).max(1),
+            // FeedManager: each item takes 1 line, minus 1 for status line
+            PageMode::FeedManager => content_height.saturating_sub(1).max(1),
+        }
+    }
+
     /// Ensures that the currently selected item is visible in the view
     pub fn ensure_selection_visible(&mut self) {
         if let Some(index) = self.selected_index {
@@ -321,10 +336,7 @@ impl App {
             }
 
             // Calculate the number of visible items in the current view
-            let items_per_page = match self.page_mode {
-                PageMode::FeedList | PageMode::Favorites => 5, // Approximately 5 items per page
-                PageMode::FeedManager => 10,                   // Approximately 10 items per page
-            };
+            let items_per_page = self.items_per_page();
 
             // Make sure selection is not below the visible area
             if index >= (self.scroll as usize + items_per_page) {
@@ -609,11 +621,7 @@ impl App {
     }
 
     pub fn page_up(&mut self) {
-        // Calculate approximate items per page
-        let page_size = match self.page_mode {
-            PageMode::FeedList | PageMode::Favorites => 5, // Approximately 5 items per page
-            PageMode::FeedManager => 10,                   // Approximately 10 items per page
-        };
+        let page_size = self.items_per_page() as u16;
 
         // Scroll up by page size
         self.scroll = self.scroll.saturating_sub(page_size);
@@ -627,14 +635,19 @@ impl App {
     }
 
     pub fn page_down(&mut self) {
-        let available_height = self.terminal_height as usize;
-        let page_size = (available_height / 3).max(1);
+        let page_size = self.items_per_page();
+
+        // Get the appropriate list length based on page mode
+        let list_len = match self.page_mode {
+            PageMode::FeedList | PageMode::Favorites => self.current_feed_content.len(),
+            PageMode::FeedManager => self.rss_feeds.len(),
+        };
 
         // Calculate maximum possible scroll value
-        let max_scroll = if self.current_feed_content.is_empty() {
+        let max_scroll = if list_len == 0 {
             0
         } else {
-            (self.current_feed_content.len() - 1).saturating_sub(available_height / 3)
+            list_len.saturating_sub(1).saturating_sub(page_size.saturating_sub(1))
         };
 
         // Calculate new scroll position, capped at maximum scroll
