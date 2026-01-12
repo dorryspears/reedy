@@ -15,12 +15,46 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
         }
     }
 
+    // Handle search mode
+    if app.input_mode == InputMode::Searching {
+        match key_event.code {
+            KeyCode::Enter => {
+                app.confirm_search();
+            }
+            KeyCode::Esc => {
+                app.cancel_search();
+            }
+            KeyCode::Char(c) => {
+                app.search_query.push(c);
+                app.update_search_filter();
+            }
+            KeyCode::Backspace => {
+                app.search_query.pop();
+                app.update_search_filter();
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     match app.page_mode {
         PageMode::FeedList => match key_event.code {
-            KeyCode::Char('q') | KeyCode::Esc => {
+            KeyCode::Char('q') => {
                 app.quit();
             }
+            KeyCode::Esc => {
+                // If there's an active search filter, clear it; otherwise quit
+                if app.filtered_indices.is_some() {
+                    app.clear_search();
+                } else {
+                    app.quit();
+                }
+            }
+            KeyCode::Char('/') => {
+                app.start_search();
+            }
             KeyCode::Char('m') => {
+                app.clear_search(); // Clear search when entering feed manager
                 app.toggle_feed_manager();
             }
             KeyCode::Char('o') => {
@@ -66,6 +100,7 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 app.toggle_favorite();
             }
             KeyCode::Char('F') => {
+                app.clear_search(); // Clear search when toggling favorites
                 app.toggle_favorites_page().await;
             }
             KeyCode::Char('?') => {
@@ -169,8 +204,19 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             _ => {}
         },
         PageMode::Favorites => match key_event.code {
-            KeyCode::Char('q') | KeyCode::Esc => {
+            KeyCode::Char('q') => {
                 app.quit();
+            }
+            KeyCode::Esc => {
+                // If there's an active search filter, clear it; otherwise quit
+                if app.filtered_indices.is_some() {
+                    app.clear_search();
+                } else {
+                    app.quit();
+                }
+            }
+            KeyCode::Char('/') => {
+                app.start_search();
             }
             KeyCode::Char('o') => {
                 app.open_selected_feed();
@@ -189,6 +235,7 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 app.toggle_favorite();
             }
             KeyCode::Char('F') => {
+                app.clear_search(); // Clear search when toggling favorites
                 app.toggle_favorites_page().await;
             }
             KeyCode::PageUp => {

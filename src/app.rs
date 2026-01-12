@@ -29,6 +29,7 @@ pub enum InputMode {
     Deleting,
     FeedManager,
     Help,
+    Searching,
 }
 
 #[derive(Debug, PartialEq)]
@@ -77,6 +78,8 @@ pub struct App {
     pub scroll: u16,
     pub terminal_width: u16,
     pub terminal_height: u16,
+    pub search_query: String,
+    pub filtered_indices: Option<Vec<usize>>,
 }
 
 impl Default for App {
@@ -96,6 +99,8 @@ impl Default for App {
             scroll: 0,
             terminal_width: 80,
             terminal_height: 24,
+            search_query: String::new(),
+            filtered_indices: None,
         }
     }
 }
@@ -184,18 +189,20 @@ impl App {
     }
 
     pub fn toggle_read_status(&mut self) {
-        if let Some(index) = self.selected_index {
-            if let Some(item) = self.current_feed_content.get(index) {
-                if self.read_items.contains(&item.id) {
-                    self.read_items.remove(&item.id);
-                    debug!("Marked item as unread: {}", item.title);
-                } else {
-                    self.read_items.insert(item.id.clone());
-                    debug!("Marked item as read: {}", item.title);
+        if let Some(visible_index) = self.selected_index {
+            if let Some(actual_index) = self.get_actual_index(visible_index) {
+                if let Some(item) = self.current_feed_content.get(actual_index) {
+                    if self.read_items.contains(&item.id) {
+                        self.read_items.remove(&item.id);
+                        debug!("Marked item as unread: {}", item.title);
+                    } else {
+                        self.read_items.insert(item.id.clone());
+                        debug!("Marked item as read: {}", item.title);
+                    }
+                    self.save_state().unwrap_or_else(|e| {
+                        error!("Failed to save read status: {}", e);
+                    });
                 }
-                self.save_state().unwrap_or_else(|e| {
-                    error!("Failed to save read status: {}", e);
-                });
             }
         }
     }
@@ -283,7 +290,7 @@ impl App {
     pub fn select_previous(&mut self) {
         if let Some(current) = self.selected_index {
             let len = match self.page_mode {
-                PageMode::FeedList | PageMode::Favorites => self.current_feed_content.len(),
+                PageMode::FeedList | PageMode::Favorites => self.visible_item_count(),
                 PageMode::FeedManager => self.rss_feeds.len(),
             };
             if len == 0 {
@@ -297,7 +304,7 @@ impl App {
     pub fn select_next(&mut self) {
         if let Some(current) = self.selected_index {
             let len = match self.page_mode {
-                PageMode::FeedList | PageMode::Favorites => self.current_feed_content.len(),
+                PageMode::FeedList | PageMode::Favorites => self.visible_item_count(),
                 PageMode::FeedManager => self.rss_feeds.len(),
             };
             if len == 0 {
@@ -573,10 +580,12 @@ impl App {
     }
 
     pub fn open_selected_feed(&self) {
-        if let Some(index) = self.selected_index {
-            if let Some(item) = self.current_feed_content.get(index) {
-                if !item.link.is_empty() {
-                    let _ = open::that(&item.link);
+        if let Some(visible_index) = self.selected_index {
+            if let Some(actual_index) = self.get_actual_index(visible_index) {
+                if let Some(item) = self.current_feed_content.get(actual_index) {
+                    if !item.link.is_empty() {
+                        let _ = open::that(&item.link);
+                    }
                 }
             }
         }
@@ -672,6 +681,110 @@ impl App {
             PageMode::FeedManager => {
                 if !self.rss_feeds.is_empty() {
                     self.selected_index = Some(0);
+                }
+            }
+        }
+    }
+
+    /// Starts search mode
+    pub fn start_search(&mut self) {
+        self.input_mode = InputMode::Searching;
+        self.search_query.clear();
+        self.filtered_indices = None;
+    }
+
+    /// Cancels search mode and clears the filter
+    pub fn cancel_search(&mut self) {
+        self.input_mode = InputMode::Normal;
+        self.search_query.clear();
+        self.filtered_indices = None;
+        self.scroll = 0;
+        // Reset selection to first item if available
+        if !self.current_feed_content.is_empty() {
+            self.selected_index = Some(0);
+        }
+    }
+
+    /// Confirms the search and stays in filtered mode
+    pub fn confirm_search(&mut self) {
+        self.input_mode = InputMode::Normal;
+        // Keep the filter active, selection remains on current filtered item
+    }
+
+    /// Updates the search filter based on the current query
+    pub fn update_search_filter(&mut self) {
+        if self.search_query.is_empty() {
+            self.filtered_indices = None;
+            self.scroll = 0;
+            if !self.current_feed_content.is_empty() {
+                self.selected_index = Some(0);
+            }
+            return;
+        }
+
+        let query_lower = self.search_query.to_lowercase();
+        let filtered: Vec<usize> = self
+            .current_feed_content
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| {
+                item.title.to_lowercase().contains(&query_lower)
+                    || item.description.to_lowercase().contains(&query_lower)
+            })
+            .map(|(i, _)| i)
+            .collect();
+
+        self.scroll = 0;
+        if filtered.is_empty() {
+            self.selected_index = None;
+        } else {
+            self.selected_index = Some(0);
+        }
+        self.filtered_indices = Some(filtered);
+    }
+
+    /// Clears the search filter (used when pressing Esc in normal mode with active filter)
+    pub fn clear_search(&mut self) {
+        self.search_query.clear();
+        self.filtered_indices = None;
+        self.scroll = 0;
+        if !self.current_feed_content.is_empty() {
+            self.selected_index = Some(0);
+        }
+    }
+
+    /// Returns the items to display based on the current filter
+    pub fn get_visible_items(&self) -> Vec<(usize, &FeedItem)> {
+        match &self.filtered_indices {
+            Some(indices) => indices
+                .iter()
+                .map(|&i| (i, &self.current_feed_content[i]))
+                .collect(),
+            None => self
+                .current_feed_content
+                .iter()
+                .enumerate()
+                .collect(),
+        }
+    }
+
+    /// Returns the number of visible items (filtered or all)
+    pub fn visible_item_count(&self) -> usize {
+        match &self.filtered_indices {
+            Some(indices) => indices.len(),
+            None => self.current_feed_content.len(),
+        }
+    }
+
+    /// Gets the actual index in current_feed_content for a visible index
+    pub fn get_actual_index(&self, visible_index: usize) -> Option<usize> {
+        match &self.filtered_indices {
+            Some(indices) => indices.get(visible_index).copied(),
+            None => {
+                if visible_index < self.current_feed_content.len() {
+                    Some(visible_index)
+                } else {
+                    None
                 }
             }
         }
@@ -842,25 +955,41 @@ impl App {
     }
 
     pub fn mark_as_read(&mut self) {
-        if let Some(index) = self.selected_index {
-            if let Some(item) = self.current_feed_content.get(index) {
-                if !self.read_items.contains(&item.id) {
-                    self.read_items.insert(item.id.clone());
-                    debug!("Marked item as read: {}", item.title);
-                    self.save_state().unwrap_or_else(|e| {
-                        error!("Failed to save read status: {}", e);
-                    });
+        if let Some(visible_index) = self.selected_index {
+            if let Some(actual_index) = self.get_actual_index(visible_index) {
+                if let Some(item) = self.current_feed_content.get(actual_index) {
+                    if !self.read_items.contains(&item.id) {
+                        self.read_items.insert(item.id.clone());
+                        debug!("Marked item as read: {}", item.title);
+                        self.save_state().unwrap_or_else(|e| {
+                            error!("Failed to save read status: {}", e);
+                        });
+                    }
                 }
             }
         }
     }
 
     pub fn mark_all_as_read(&mut self) {
-        for item in &self.current_feed_content {
-            if !self.read_items.contains(&item.id) {
-                self.read_items.insert(item.id.clone());
-                debug!("Marked item as read: {}", item.title);
-            }
+        // Get items to mark - either filtered items or all items
+        let items_to_mark: Vec<String> = match &self.filtered_indices {
+            Some(indices) => indices
+                .iter()
+                .filter_map(|&i| self.current_feed_content.get(i))
+                .filter(|item| !self.read_items.contains(&item.id))
+                .map(|item| item.id.clone())
+                .collect(),
+            None => self
+                .current_feed_content
+                .iter()
+                .filter(|item| !self.read_items.contains(&item.id))
+                .map(|item| item.id.clone())
+                .collect(),
+        };
+
+        for id in items_to_mark {
+            self.read_items.insert(id.clone());
+            debug!("Marked item as read: {}", id);
         }
         self.save_state().unwrap_or_else(|e| {
             error!("Failed to save read status: {}", e);
@@ -872,28 +1001,41 @@ impl App {
     }
 
     pub fn toggle_favorite(&mut self) {
-        if let Some(index) = self.selected_index {
-            if let Some(item) = self.current_feed_content.get(index) {
-                let was_favorite = self.favorites.contains(&item.id);
-                if was_favorite {
-                    self.favorites.remove(&item.id);
-                    debug!("Removed item from favorites: {}", item.title);
-                } else {
-                    self.favorites.insert(item.id.clone());
-                    debug!("Added item to favorites: {}", item.title);
-                }
-                self.save_state().unwrap_or_else(|e| {
-                    error!("Failed to save favorites: {}", e);
-                });
+        if let Some(visible_index) = self.selected_index {
+            if let Some(actual_index) = self.get_actual_index(visible_index) {
+                if let Some(item) = self.current_feed_content.get(actual_index) {
+                    let was_favorite = self.favorites.contains(&item.id);
+                    if was_favorite {
+                        self.favorites.remove(&item.id);
+                        debug!("Removed item from favorites: {}", item.title);
+                    } else {
+                        self.favorites.insert(item.id.clone());
+                        debug!("Added item to favorites: {}", item.title);
+                    }
+                    self.save_state().unwrap_or_else(|e| {
+                        error!("Failed to save favorites: {}", e);
+                    });
 
-                // If we're in Favorites view and just unfavorited an item, remove it from the list
-                if was_favorite && self.page_mode == PageMode::Favorites {
-                    self.current_feed_content.remove(index);
-                    // Adjust selected index
-                    if self.current_feed_content.is_empty() {
-                        self.selected_index = None;
-                    } else if index >= self.current_feed_content.len() {
-                        self.selected_index = Some(self.current_feed_content.len() - 1);
+                    // If we're in Favorites view and just unfavorited an item, remove it from the list
+                    if was_favorite && self.page_mode == PageMode::Favorites {
+                        self.current_feed_content.remove(actual_index);
+                        // Update filtered indices if active
+                        if let Some(ref mut indices) = self.filtered_indices {
+                            // Remove the actual_index from filtered indices and adjust remaining indices
+                            indices.retain(|&i| i != actual_index);
+                            for i in indices.iter_mut() {
+                                if *i > actual_index {
+                                    *i -= 1;
+                                }
+                            }
+                        }
+                        // Adjust selected index
+                        let visible_count = self.visible_item_count();
+                        if visible_count == 0 {
+                            self.selected_index = None;
+                        } else if visible_index >= visible_count {
+                            self.selected_index = Some(visible_count - 1);
+                        }
                     }
                 }
             }

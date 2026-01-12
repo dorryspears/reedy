@@ -260,3 +260,132 @@ fn test_items_per_page_dynamic_calculation() {
     app.page_mode = PageMode::Favorites;
     assert_eq!(app.items_per_page(), 5);
 }
+
+#[test]
+fn test_search_filter_functionality() {
+    let mut app = App::default();
+
+    // Add test items
+    let items = vec![
+        FeedItem {
+            title: "Rust Programming".to_string(),
+            description: "Learn about Rust programming language".to_string(),
+            link: "https://example.com/rust".to_string(),
+            published: Some(SystemTime::now()),
+            id: "id-1".to_string(),
+        },
+        FeedItem {
+            title: "Python Tutorial".to_string(),
+            description: "Getting started with Python".to_string(),
+            link: "https://example.com/python".to_string(),
+            published: Some(SystemTime::now()),
+            id: "id-2".to_string(),
+        },
+        FeedItem {
+            title: "JavaScript Guide".to_string(),
+            description: "Modern JavaScript development with Rust tools".to_string(),
+            link: "https://example.com/js".to_string(),
+            published: Some(SystemTime::now()),
+            id: "id-3".to_string(),
+        },
+    ];
+
+    for item in items {
+        app.current_feed_content.push(item);
+    }
+    app.selected_index = Some(0);
+
+    // Initially, no filter is active
+    assert!(app.filtered_indices.is_none());
+    assert_eq!(app.visible_item_count(), 3);
+
+    // Start search mode
+    app.start_search();
+    assert_eq!(app.input_mode, InputMode::Searching);
+    assert!(app.search_query.is_empty());
+
+    // Type a search query
+    app.search_query = "rust".to_string();
+    app.update_search_filter();
+
+    // Should filter to items containing "rust" (case-insensitive)
+    assert!(app.filtered_indices.is_some());
+    assert_eq!(app.visible_item_count(), 2); // "Rust Programming" and "JavaScript Guide" (contains "Rust tools" in description)
+
+    // Confirm search
+    app.confirm_search();
+    assert_eq!(app.input_mode, InputMode::Normal);
+    // Filter should still be active
+    assert!(app.filtered_indices.is_some());
+    assert_eq!(app.visible_item_count(), 2);
+
+    // Clear search
+    app.clear_search();
+    assert!(app.filtered_indices.is_none());
+    assert_eq!(app.visible_item_count(), 3);
+
+    // Test cancel search
+    app.start_search();
+    app.search_query = "python".to_string();
+    app.update_search_filter();
+    assert_eq!(app.visible_item_count(), 1);
+
+    app.cancel_search();
+    assert_eq!(app.input_mode, InputMode::Normal);
+    assert!(app.filtered_indices.is_none());
+    assert_eq!(app.visible_item_count(), 3);
+}
+
+#[test]
+fn test_search_with_no_matches() {
+    let mut app = App::default();
+
+    // Add test item
+    app.current_feed_content.push(FeedItem {
+        title: "Rust Programming".to_string(),
+        description: "Learn Rust".to_string(),
+        link: "https://example.com/rust".to_string(),
+        published: Some(SystemTime::now()),
+        id: "id-1".to_string(),
+    });
+    app.selected_index = Some(0);
+
+    // Search for something that doesn't exist
+    app.search_query = "xyz123nonexistent".to_string();
+    app.update_search_filter();
+
+    // Should have zero visible items
+    assert_eq!(app.visible_item_count(), 0);
+    assert_eq!(app.selected_index, None);
+}
+
+#[test]
+fn test_get_actual_index_with_filter() {
+    let mut app = App::default();
+
+    // Add 5 items
+    for i in 0..5 {
+        app.current_feed_content.push(FeedItem {
+            title: format!("Item {}", i),
+            description: format!("Description {}", i),
+            link: format!("https://example.com/{}", i),
+            published: Some(SystemTime::now()),
+            id: format!("id-{}", i),
+        });
+    }
+
+    // Without filter, visible index equals actual index
+    assert_eq!(app.get_actual_index(0), Some(0));
+    assert_eq!(app.get_actual_index(2), Some(2));
+    assert_eq!(app.get_actual_index(4), Some(4));
+    assert_eq!(app.get_actual_index(5), None); // Out of bounds
+
+    // Set up a filter that shows items 1 and 3 only
+    app.filtered_indices = Some(vec![1, 3]);
+
+    // Now visible index 0 -> actual index 1
+    // visible index 1 -> actual index 3
+    assert_eq!(app.get_actual_index(0), Some(1));
+    assert_eq!(app.get_actual_index(1), Some(3));
+    assert_eq!(app.get_actual_index(2), None); // Out of bounds in filtered list
+}

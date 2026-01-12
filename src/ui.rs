@@ -82,20 +82,23 @@ pub fn render(app: &App, frame: &mut Frame) {
 fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
     // Calculate how many items can fit per page (each item takes 3 lines plus a separator)
     let items_per_page = ((area.height as usize).saturating_sub(2) / 3).max(1); // Ensure at least 1 item per page
+
+    // Get visible items (filtered or all)
+    let visible_items = app.get_visible_items();
+    let total_visible = visible_items.len();
     let total_items = app.current_feed_content.len();
 
     // Calculate the visible range for items
     let start_idx = app.scroll as usize;
-    let end_idx = (start_idx + items_per_page).min(total_items);
+    let end_idx = (start_idx + items_per_page).min(total_visible);
 
-    let items: Vec<ListItem> = app
-        .current_feed_content
+    let items: Vec<ListItem> = visible_items
         .iter()
         .enumerate()
         .skip(start_idx)
         .take(items_per_page)
-        .map(|(i, item)| {
-            let style = if Some(i) == app.selected_index {
+        .map(|(visible_idx, (_actual_idx, item))| {
+            let style = if Some(visible_idx) == app.selected_index {
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::REVERSED)
@@ -149,30 +152,46 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
         .collect();
 
     // Create a title that shows both the current page and total pages
-    let page_count = if total_items == 0 {
+    let page_count = if total_visible == 0 {
         1
     } else {
         // Ceiling division
-        total_items.div_ceil(items_per_page)
+        total_visible.div_ceil(items_per_page)
     };
 
-    let current_page = if total_items == 0 {
+    let current_page = if total_visible == 0 {
         1
     } else {
         (start_idx / items_per_page) + 1
     };
 
+    // Build title with filter indicator if active
+    let title = if app.filtered_indices.is_some() {
+        format!(
+            "Feed Content [Filter: \"{}\"] (Page {}/{}, Items {}-{}/{} of {})",
+            app.search_query,
+            current_page,
+            page_count,
+            if total_visible == 0 { 0 } else { start_idx + 1 },
+            end_idx,
+            total_visible,
+            total_items
+        )
+    } else {
+        format!(
+            "Feed Content (Page {}/{}, Items {}-{}/{})",
+            current_page,
+            page_count,
+            if total_visible == 0 { 0 } else { start_idx + 1 },
+            end_idx,
+            total_visible
+        )
+    };
+
     let list = List::new(items)
         .block(
             Block::default()
-                .title(format!(
-                    "Feed Content (Page {}/{}, Items {}-{}/{})",
-                    current_page,
-                    page_count,
-                    if total_items == 0 { 0 } else { start_idx + 1 },
-                    end_idx,
-                    total_items
-                ))
+                .title(title)
                 .borders(Borders::ALL),
         )
         .style(Style::default().fg(Color::White));
@@ -257,6 +276,15 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
             Line::from("Enter          - Read selected feed"),
             Line::from(""),
             Line::from(vec![Span::styled(
+                "Search",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(Color::Yellow),
+            )]),
+            Line::from("/              - Start search/filter"),
+            Line::from("Esc            - Clear search filter (when active)"),
+            Line::from(""),
+            Line::from(vec![Span::styled(
                 "Actions",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
@@ -270,7 +298,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
             Line::from("m              - Open feed manager"),
             Line::from("c              - Refresh feed cache"),
             Line::from("?              - Toggle this help menu"),
-            Line::from("q/Esc          - Quit application"),
+            Line::from("q              - Quit application"),
         ],
         PageMode::FeedManager => vec![
             Line::from(vec![Span::styled(
@@ -322,6 +350,15 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
             Line::from("g              - Scroll to top of feed"),
             Line::from(""),
             Line::from(vec![Span::styled(
+                "Search",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(Color::Yellow),
+            )]),
+            Line::from("/              - Start search/filter"),
+            Line::from("Esc            - Clear search filter (when active)"),
+            Line::from(""),
+            Line::from(vec![Span::styled(
                 "Actions",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
@@ -331,7 +368,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
             Line::from("f              - Remove item from favorites"),
             Line::from("F              - Return to all feeds view"),
             Line::from("?              - Toggle this help menu"),
-            Line::from("q/Esc          - Quit application"),
+            Line::from("q              - Quit application"),
         ],
     };
 
@@ -363,20 +400,26 @@ pub fn truncate_text(text: &str, max_width: u16) -> String {
 fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
     let commands = if app.input_mode == InputMode::Help {
         "[q/Esc/?] Exit Help".to_string()
+    } else if app.input_mode == InputMode::Searching {
+        format!("Search: {}█  [Enter] Confirm  [Esc] Cancel", app.search_query)
     } else {
         match app.page_mode {
             PageMode::FeedList => {
                 if app.current_feed_content.is_empty() {
                     "[m] Manage Feeds  [c] Refresh Cache  [F] Favorites  [?] Help  [q] Quit".to_string()
+                } else if app.filtered_indices.is_some() {
+                    "[↑↓] Navigate  [/] Search  [Esc] Clear Filter  [o] Open  [f] Favorite  [?] Help  [q] Quit".to_string()
                 } else {
-                    "[↑↓] Navigate  [g] Top  [o] Open in Browser  [m] Manage Feeds  [c] Refresh Cache  [r] Mark as Read  [R] Mark All as Read  [f] Toggle Favorite  [F] Favorites  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [/] Search  [o] Open  [m] Manage  [c] Refresh  [r] Read  [f] Favorite  [F] Favorites  [?] Help  [q] Quit".to_string()
                 }
             }
             PageMode::Favorites => {
                 if app.current_feed_content.is_empty() {
                     "[F] Back to Feeds  [?] Help  [q] Quit".to_string()
+                } else if app.filtered_indices.is_some() {
+                    "[↑↓] Navigate  [/] Search  [Esc] Clear Filter  [o] Open  [f] Favorite  [F] Back  [?] Help  [q] Quit".to_string()
                 } else {
-                    "[↑↓] Navigate  [g] Top  [o] Open in Browser  [f] Toggle Favorite  [F] Back to Feeds  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [/] Search  [o] Open  [f] Favorite  [F] Back to Feeds  [?] Help  [q] Quit".to_string()
                 }
             }
             PageMode::FeedManager => match app.input_mode {
@@ -388,7 +431,7 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
                     "Use ↑↓ to select feed, Enter to delete, Esc to cancel".to_string()
                 }
                 InputMode::FeedManager => "[m] Back to Feeds  [?] Help".to_string(),
-                InputMode::Help => unreachable!(), // This case is already handled above
+                InputMode::Help | InputMode::Searching => unreachable!(), // These cases are already handled above
             },
         }
     };

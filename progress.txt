@@ -194,3 +194,54 @@ This pattern is inefficient and can cause deadlocks in certain scenarios because
 - `src/app.rs` - Removed `debug!("test");` from `select_feed()` function
 
 **Tests:** All tests pass (17 total: 12 app tests, 5 ui tests)
+
+---
+
+### Implemented: High Priority Feature #1 - Search/Filter Functionality
+
+**Location:** `src/app.rs`, `src/handler.rs`, `src/ui.rs`
+
+**Description:** Added the ability to filter feed items by keyword in title or description. This is an essential feature for users with many subscriptions to find specific content.
+
+**Implementation Details:**
+
+1. **New InputMode:** Added `InputMode::Searching` to handle search text input
+2. **New App fields:**
+   - `search_query: String` - stores the current search query
+   - `filtered_indices: Option<Vec<usize>>` - stores indices of matching items when filter is active
+3. **New App methods:**
+   - `start_search()` - enters search mode
+   - `cancel_search()` - cancels search and clears filter
+   - `confirm_search()` - confirms search, keeps filter active
+   - `update_search_filter()` - updates filtered indices based on query
+   - `clear_search()` - clears filter when pressing Esc in normal mode
+   - `get_visible_items()` - returns filtered or all items based on filter state
+   - `visible_item_count()` - returns count of visible items
+   - `get_actual_index()` - converts visible index to actual index in feed content
+
+4. **Key bindings:**
+   - `/` - Start search mode (in FeedList and Favorites views)
+   - `Enter` - Confirm search and keep filter active
+   - `Esc` - Cancel search (clears filter), or clear active filter in normal mode
+
+5. **UI Updates:**
+   - Command bar shows search input with cursor during search mode
+   - Title bar shows filter indicator when filter is active: `[Filter: "query"]`
+   - Shows filtered item count vs total: "Items 1-5/5 of 50"
+   - Help menu updated with search documentation
+
+6. **Modified existing methods to work with filtered indices:**
+   - `select_previous()`, `select_next()` - navigate filtered list
+   - `open_selected_feed()` - uses actual index
+   - `toggle_read_status()` - uses actual index
+   - `mark_as_read()` - uses actual index
+   - `mark_all_as_read()` - marks only visible (filtered) items
+   - `toggle_favorite()` - uses actual index, handles filter index updates
+
+**Files changed:**
+- `src/app.rs` - Added search state, methods, and updated existing methods
+- `src/handler.rs` - Added search mode key handling and `/` key binding
+- `src/ui.rs` - Updated rendering to show filtered items and search UI
+- `tests/app_tests.rs` - Added 3 new tests for search functionality
+
+**Tests:** All tests pass (20 total: 15 app tests, 5 ui tests)

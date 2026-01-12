@@ -130,9 +130,18 @@ pub mod ui;
 
 ### High Priority
 
-#### 1. Search/Filter Functionality
+#### ~~1. Search/Filter Functionality~~ DONE
 **Description:** Allow users to filter feed items by keyword in title or description.
 **Value:** Essential for users with many subscriptions to find specific content.
+
+**Implementation:**
+- Press `/` to start search mode in FeedList or Favorites view
+- Type a search query to filter items by title or description (case-insensitive)
+- Press `Enter` to confirm and keep filter active while navigating
+- Press `Esc` to cancel search (clears filter)
+- When filter is active, press `Esc` to clear filter (instead of quit)
+- Filter indicator shows in title bar: `[Filter: "query"]`
+- All actions (open, read, favorite) work correctly with filtered items
 
 #### 2. Feed Export/Import via Clipboard
 **Description:** Simple feed list export and import using the clipboard.
