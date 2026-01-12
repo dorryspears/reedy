@@ -11,7 +11,7 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use reedy::{
     app::{App, AppResult},
     event::{Event, EventHandler},
-    handler::handle_key_events,
+    handler::{handle_key_events, handle_mouse_events},
     tui::Tui,
 };
 
@@ -54,7 +54,7 @@ async fn main() -> AppResult<()> {
                 app.perform_auto_refresh().await;
             }
             Event::Key(key_event) => handle_key_events(key_event, &mut app).await?,
-            Event::Mouse(_) => {}
+            Event::Mouse(mouse_event) => handle_mouse_events(mouse_event, &mut app).await?,
             Event::Resize(width, height) => {
                 app.terminal_width = width;
                 app.terminal_height = height;

@@ -322,9 +322,17 @@ https://news.site.com/atom.xml
 - Command mode displays `:command█` in command bar
 - Help menus updated with vi-style command documentation
 
-#### 14. Mouse Support
+#### ~~14. Mouse Support~~ DONE
 **Description:** Enable clicking to select items and scroll.
 **Value:** Accessibility for users who prefer mouse navigation.
+
+**Implementation:**
+- Click on feed items or feeds to select them (single click)
+- Click on an already-selected item to open preview (FeedList/Favorites) or select feed (FeedManager)
+- Click anywhere in help mode to close the help menu
+- Mouse scroll wheel navigates through items (scrolls 3 items at a time)
+- Mouse scroll in preview mode scrolls the article content
+- Mouse events are ignored during text input modes (Adding, Importing, Searching, etc.)
 
 #### 15. Export Articles
 **Description:** Save articles to file (markdown, plain text) or copy to clipboard.

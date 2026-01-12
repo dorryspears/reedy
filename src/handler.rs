@@ -1,5 +1,5 @@
 use crate::app::{App, AppResult, InputMode, Keybindings, PageMode};
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind, MouseButton};
 use log::{debug, error};
 
 /// Parses a key string (like "Enter", "k", "Up", "PageDown") into a KeyCode.
@@ -385,4 +385,166 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
         }
     }
     Ok(())
+}
+
+/// Handles mouse events for navigation and scrolling
+pub async fn handle_mouse_events(mouse_event: MouseEvent, app: &mut App) -> AppResult<()> {
+    // Ignore mouse events in text input modes
+    match app.input_mode {
+        InputMode::Adding | InputMode::Importing | InputMode::Searching
+        | InputMode::SettingCategory | InputMode::Command => {
+            return Ok(());
+        }
+        _ => {}
+    }
+
+    match mouse_event.kind {
+        MouseEventKind::Down(MouseButton::Left) => {
+            handle_mouse_click(mouse_event.row, app).await?;
+        }
+        MouseEventKind::ScrollUp => {
+            handle_mouse_scroll_up(app);
+        }
+        MouseEventKind::ScrollDown => {
+            handle_mouse_scroll_down(app);
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+/// Handles a mouse click at the given row position
+async fn handle_mouse_click(row: u16, app: &mut App) -> AppResult<()> {
+    // Layout: 3 lines title bar, then content area, then 3 lines command bar
+    // Content area starts at row 3 and ends at terminal_height - 3
+    let content_start = 3;
+    let content_end = app.terminal_height.saturating_sub(3);
+
+    // Check if click is in the content area
+    if row < content_start || row >= content_end {
+        return Ok(());
+    }
+
+    // Calculate the row within the content area (accounting for the border)
+    let content_row = row.saturating_sub(content_start + 1); // +1 for border
+
+    // Handle click based on current mode
+    match app.input_mode {
+        InputMode::Help => {
+            // Clicking anywhere in help mode closes it
+            app.toggle_help();
+        }
+        InputMode::Preview => {
+            // Clicking in preview mode does nothing special for now
+            // Could potentially implement scroll-to-position later
+        }
+        InputMode::Normal | InputMode::Deleting | InputMode::FeedManager => {
+            match app.page_mode {
+                PageMode::FeedList | PageMode::Favorites => {
+                    // Each feed item takes 3 lines in the list view
+                    let item_height = 3;
+                    let clicked_item = (content_row / item_height) as usize;
+                    let actual_index = app.scroll as usize + clicked_item;
+
+                    // Check if the click is within the valid item range
+                    let item_count = app.visible_item_count();
+                    if actual_index < item_count {
+                        if Some(actual_index) == app.selected_index {
+                            // Double-click behavior: if already selected, open preview
+                            app.open_preview();
+                        } else {
+                            app.selected_index = Some(actual_index);
+                            debug!("Mouse selected item at index {}", actual_index);
+                        }
+                    }
+                }
+                PageMode::FeedManager => {
+                    // In Feed Manager, calculate item index accounting for category headers
+                    // Each item takes 1 line, but we have category headers interspersed
+                    let feeds_by_category = app.get_feeds_by_category();
+                    let mut current_row: u16 = 0;
+                    let mut feed_index = 0;
+                    let scroll_offset = app.scroll as u16;
+
+                    'outer: for (_, feeds) in &feeds_by_category {
+                        // Category header takes 1 line
+                        if current_row >= scroll_offset && current_row - scroll_offset == content_row {
+                            // Clicked on a category header - do nothing
+                            break;
+                        }
+                        current_row += 1;
+
+                        for _ in feeds {
+                            if current_row >= scroll_offset && current_row - scroll_offset == content_row {
+                                // Clicked on a feed item
+                                if feed_index < app.rss_feeds.len() {
+                                    if Some(feed_index) == app.selected_index {
+                                        // Double-click behavior: if already selected, select the feed
+                                        app.select_feed(feed_index).await?;
+                                        app.toggle_feed_manager();
+                                        if !app.current_feed_content.is_empty() {
+                                            app.selected_index = Some(0);
+                                            app.scroll = 0;
+                                        }
+                                    } else {
+                                        app.selected_index = Some(feed_index);
+                                        debug!("Mouse selected feed at index {}", feed_index);
+                                    }
+                                }
+                                break 'outer;
+                            }
+                            current_row += 1;
+                            feed_index += 1;
+                        }
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+/// Handles mouse scroll up event
+fn handle_mouse_scroll_up(app: &mut App) {
+    match app.input_mode {
+        InputMode::Preview => {
+            app.preview_scroll_up();
+            app.preview_scroll_up();
+            app.preview_scroll_up();
+        }
+        InputMode::Help => {
+            // Could implement help scrolling if needed
+        }
+        InputMode::Normal | InputMode::Deleting | InputMode::FeedManager => {
+            // Scroll up by 3 items (matching page up/down behavior)
+            for _ in 0..3 {
+                app.select_previous();
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Handles mouse scroll down event
+fn handle_mouse_scroll_down(app: &mut App) {
+    match app.input_mode {
+        InputMode::Preview => {
+            app.preview_scroll_down();
+            app.preview_scroll_down();
+            app.preview_scroll_down();
+        }
+        InputMode::Help => {
+            // Could implement help scrolling if needed
+        }
+        InputMode::Normal | InputMode::Deleting | InputMode::FeedManager => {
+            // Scroll down by 3 items (matching page up/down behavior)
+            for _ in 0..3 {
+                app.select_next();
+            }
+        }
+        _ => {}
+    }
 }

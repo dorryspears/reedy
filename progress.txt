@@ -1057,3 +1057,51 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (58 total: 47 app tests, 11 ui tests)
 
+---
+
+### Implemented: Low Priority Feature #14 - Mouse Support
+
+**Location:** `src/handler.rs`, `src/main.rs`
+
+**Description:** Added mouse support for clicking to select items and scroll wheel navigation. This improves accessibility for users who prefer mouse navigation over keyboard-only interfaces.
+
+**Implementation Details:**
+
+1. **New mouse handler function:** Added `handle_mouse_events()` in `handler.rs` to process mouse events
+
+2. **Click-to-select functionality:**
+   - In FeedList/Favorites view: clicking on a feed item selects it
+   - Clicking on an already-selected item opens the article preview (simulating double-click)
+   - In FeedManager view: clicking on a feed selects it, accounting for category headers
+   - Clicking on an already-selected feed loads it and returns to FeedList
+   - Clicking anywhere in Help mode closes the help menu
+
+3. **Scroll wheel support:**
+   - ScrollUp/ScrollDown events navigate through items (3 items per scroll tick)
+   - In Preview mode, scroll events scroll the article content
+   - Scrolling is ignored in Help mode (could be implemented later if needed)
+
+4. **Input mode handling:**
+   - Mouse events are ignored during text input modes (Adding, Importing, Searching, SettingCategory, Command)
+   - This prevents accidental selections while typing
+
+5. **Layout calculation:**
+   - Mouse click positions are calculated relative to the content area (accounting for 3-line title bar and 3-line command bar)
+   - FeedList/Favorites items use 3-line height per item
+   - FeedManager items use 1-line height per item, with category headers properly accounted for
+
+6. **Integration:**
+   - Updated `main.rs` to call `handle_mouse_events()` instead of ignoring mouse events
+   - Mouse capture was already enabled in `tui.rs`
+
+**Key bindings:**
+- Left click: Select item / Open preview (if already selected) / Close help
+- Scroll up: Navigate to previous items (3 at a time) / Scroll preview up
+- Scroll down: Navigate to next items (3 at a time) / Scroll preview down
+
+**Files changed:**
+- `src/handler.rs` - Added `handle_mouse_events()`, `handle_mouse_click()`, `handle_mouse_scroll_up()`, `handle_mouse_scroll_down()` functions
+- `src/main.rs` - Updated to call `handle_mouse_events()` for mouse events
+
+**Tests:** All tests pass (58 total: 47 app tests, 11 ui tests)
+
