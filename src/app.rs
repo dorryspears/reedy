@@ -101,7 +101,7 @@ impl Default for App {
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let mut app = Self::default();
 
         // Get initial terminal size
@@ -115,27 +115,23 @@ impl App {
             app.error_message = Some(format!("Failed to load feeds: {}", e));
         });
 
-        // Cache all feeds in the background and load all cached content
+        // Cache all feeds and load all cached content
         if !app.rss_feeds.is_empty() {
             app.selected_index = Some(0);
-            tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    let _ = app.refresh_all_feeds().await;
-                    app.cache_all_feeds().await;
+            let _ = app.refresh_all_feeds().await;
+            app.cache_all_feeds().await;
 
-                    // Load and combine all cached feed content
-                    let mut all_items = Vec::new();
-                    for url in &app.rss_feeds {
-                        if let Some(cached_items) = app.load_feed_cache(url) {
-                            all_items.extend(cached_items);
-                        }
-                    }
+            // Load and combine all cached feed content
+            let mut all_items = Vec::new();
+            for url in &app.rss_feeds {
+                if let Some(cached_items) = app.load_feed_cache(url) {
+                    all_items.extend(cached_items);
+                }
+            }
 
-                    // Sort all items by date, newest first
-                    all_items.sort_by(|a, b| b.published.cmp(&a.published));
-                    app.current_feed_content = all_items;
-                });
-            });
+            // Sort all items by date, newest first
+            all_items.sort_by(|a, b| b.published.cmp(&a.published));
+            app.current_feed_content = all_items;
         }
         app
     }
@@ -905,7 +901,7 @@ impl App {
         }
     }
 
-    pub fn toggle_favorites_page(&mut self) {
+    pub async fn toggle_favorites_page(&mut self) {
         match self.page_mode {
             PageMode::Favorites => {
                 self.page_mode = PageMode::FeedList;
@@ -913,24 +909,20 @@ impl App {
                 self.scroll = 0;
 
                 // Reset selection and reload all feeds like at startup
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        let _ = self.refresh_all_feeds().await;
-                        self.cache_all_feeds().await;
+                let _ = self.refresh_all_feeds().await;
+                self.cache_all_feeds().await;
 
-                        // Load and combine all cached feed content
-                        let mut all_items = Vec::new();
-                        for url in &self.rss_feeds {
-                            if let Some(cached_items) = self.load_feed_cache(url) {
-                                all_items.extend(cached_items);
-                            }
-                        }
+                // Load and combine all cached feed content
+                let mut all_items = Vec::new();
+                for url in &self.rss_feeds {
+                    if let Some(cached_items) = self.load_feed_cache(url) {
+                        all_items.extend(cached_items);
+                    }
+                }
 
-                        // Sort all items by date, newest first
-                        all_items.sort_by(|a, b| b.published.cmp(&a.published));
-                        self.current_feed_content = all_items;
-                    });
-                });
+                // Sort all items by date, newest first
+                all_items.sort_by(|a, b| b.published.cmp(&a.published));
+                self.current_feed_content = all_items;
                 self.selected_index = Some(0);
             }
             _ => {

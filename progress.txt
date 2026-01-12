@@ -153,3 +153,29 @@
 - `tests/app_tests.rs` - Added `test_items_per_page_dynamic_calculation` to verify the calculation works correctly for different terminal heights and page modes
 
 **Tests:** All tests pass (17 total: 12 app tests, 5 ui tests)
+
+---
+
+### Fixed: Medium Bug #9 - Blocking Async Patterns
+
+**Location:** `src/app.rs:113-130`, `src/app.rs:885-902`, `src/handler.rs:60-67`, `src/handler.rs:96-100`
+
+**Problem:** The codebase used `tokio::task::block_in_place` with `tokio::runtime::Handle::current().block_on()` to run async code in several places:
+1. `App::new()` - blocked during initialization to refresh and cache feeds
+2. `toggle_favorites_page()` - blocked when switching from favorites back to feed list
+3. `handler.rs` - blocked in the 'c' key handlers for refreshing/caching feeds
+
+This pattern is inefficient and can cause deadlocks in certain scenarios because it blocks the current thread waiting for async operations, defeating the purpose of async programming.
+
+**Solution:**
+1. Converted `App::new()` from sync to async - now called with `.await` in main.rs
+2. Converted `toggle_favorites_page()` from sync to async - now called with `.await` in handler.rs
+3. Removed all `block_in_place` and `block_on` calls from handler.rs - the handler is already async, so async methods can be awaited directly
+4. Updated `main.rs` to await the async `App::new()` call
+
+**Files changed:**
+- `src/app.rs` - Made `App::new()` and `toggle_favorites_page()` async, removed blocking wrappers
+- `src/handler.rs` - Removed `block_in_place`/`block_on` wrappers, now directly awaits async methods
+- `src/main.rs` - Updated to await `App::new()`
+
+**Tests:** All tests pass (17 total: 12 app tests, 5 ui tests)

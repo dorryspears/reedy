@@ -57,20 +57,16 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 app.scroll_to_top();
             }
             KeyCode::Char('c') => {
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        if let Err(e) = app.refresh_all_feeds().await {
-                            error!("Failed to refresh feeds: {}", e);
-                            app.error_message = Some(format!("Failed to refresh feeds: {}", e));
-                        }
-                    });
-                });
+                if let Err(e) = app.refresh_all_feeds().await {
+                    error!("Failed to refresh feeds: {}", e);
+                    app.error_message = Some(format!("Failed to refresh feeds: {}", e));
+                }
             }
             KeyCode::Char('f') => {
                 app.toggle_favorite();
             }
             KeyCode::Char('F') => {
-                app.toggle_favorites_page();
+                app.toggle_favorites_page().await;
             }
             KeyCode::Char('?') => {
                 app.toggle_help();
@@ -93,11 +89,7 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                     app.start_deleting();
                 }
                 KeyCode::Char('c') => {
-                    tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(async {
-                            app.cache_all_feeds().await;
-                        });
-                    });
+                    app.cache_all_feeds().await;
                 }
                 KeyCode::Enter => {
                     if let Some(index) = app.selected_index {
@@ -197,7 +189,7 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 app.toggle_favorite();
             }
             KeyCode::Char('F') => {
-                app.toggle_favorites_page();
+                app.toggle_favorites_page().await;
             }
             KeyCode::PageUp => {
                 app.page_up();

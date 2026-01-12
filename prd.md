@@ -98,11 +98,13 @@ pub mod ui;
 
 **Fix:** Added `items_per_page()` helper method that dynamically calculates visible items based on terminal height and page mode. Updated `ensure_selection_visible()`, `page_up()`, and `page_down()` to use this helper instead of hardcoded values.
 
-#### 9. Blocking Async Patterns
+#### ~~9. Blocking Async Patterns~~ FIXED
 **Location:** `src/app.rs:113-130`, `src/app.rs:885-902`
 **Description:** Using `block_in_place` with `block_on` inside async context is inefficient and can cause deadlocks in certain scenarios.
 
 **Impact:** Performance degradation; potential deadlocks.
+
+**Fix:** Converted `App::new()` and `toggle_favorites_page()` from sync to async functions. Removed all `tokio::task::block_in_place` and `block_on` calls from `app.rs` and `handler.rs`. Async operations now flow naturally through the async runtime without blocking.
 
 ---
 

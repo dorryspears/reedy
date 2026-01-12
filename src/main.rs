@@ -33,7 +33,7 @@ async fn main() -> AppResult<()> {
     }
 
     // Create an application.
-    let mut app = App::new();
+    let mut app = App::new().await;
 
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(io::stdout());
