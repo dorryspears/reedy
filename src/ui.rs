@@ -344,6 +344,10 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
 
 /// Truncates text to fit within a specified width, adding ellipsis if necessary
 pub fn truncate_text(text: &str, max_width: u16) -> String {
+    // Handle edge case where max_width is too small for ellipsis
+    if max_width < 3 {
+        return text.chars().take(max_width as usize).collect();
+    }
     if text.len() <= max_width as usize {
         text.to_string()
     } else {

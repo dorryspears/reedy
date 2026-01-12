@@ -1,0 +1,17 @@
+# Progress Log
+
+## 2026-01-12
+
+### Fixed: Critical Bug #2 - Integer Underflow in `truncate_text`
+
+**Location:** `src/ui.rs:346-361`
+
+**Problem:** When `max_width < 3`, the subtraction `(max_width - 3) as usize` would cause integer underflow, leading to potential panic or unexpected behavior when the terminal is very narrow.
+
+**Solution:** Added an early return guard at the beginning of `truncate_text()` that checks if `max_width < 3`. When true, it returns the text truncated to `max_width` characters without attempting to add ellipsis.
+
+**Files changed:**
+- `src/ui.rs` - Added guard for small width values
+- `tests/ui_tests.rs` - Added test `test_truncate_text_very_small_width` covering edge cases for width 0, 1, 2, and 3
+
+**Tests:** All tests pass (8 total: 4 app tests, 5 ui tests including new edge case test)

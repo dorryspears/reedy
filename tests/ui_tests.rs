@@ -35,3 +35,21 @@ fn test_truncate_text_unicode() {
     assert!(result.len() <= (max_width as usize + 3)); // +3 for ellipsis
     assert!(result.ends_with("..."));
 }
+
+#[test]
+fn test_truncate_text_very_small_width() {
+    // Test edge case where max_width < 3 (too small for ellipsis)
+    let text = "Hello World";
+
+    // Width of 0 should return empty string
+    assert_eq!(truncate_text(text, 0), "");
+
+    // Width of 1 should return first character
+    assert_eq!(truncate_text(text, 1), "H");
+
+    // Width of 2 should return first two characters
+    assert_eq!(truncate_text(text, 2), "He");
+
+    // Width of 3 should use normal truncation with ellipsis
+    assert_eq!(truncate_text(text, 3), "...");
+}
