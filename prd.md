@@ -44,11 +44,13 @@ Reedy is a terminal-based RSS/Atom feed reader built with Rust. It provides a ke
 
 **Fix:** Removed the `clear_cache_dir()` call from `App::new()`. The cache already has proper 1-hour TTL expiration logic in `load_feed_cache()`, so clearing on startup was unnecessary. Also removed the now-unused `clear_cache_dir()` function.
 
-#### 4. No HTTP Request Timeouts
+#### ~~4. No HTTP Request Timeouts~~ FIXED
 **Location:** `src/app.rs:371`, `src/app.rs:435`, `src/app.rs:730`, `src/app.rs:780`
 **Description:** All `reqwest::get()` calls lack timeout configuration. Slow or unresponsive feeds will hang the application indefinitely.
 
 **Impact:** Application becomes unresponsive if a feed server is slow or unreachable.
+
+**Fix:** Added a `create_http_client()` helper function that creates a `reqwest::Client` with a 30-second timeout. All HTTP requests now use this client instead of the bare `reqwest::get()` function.
 
 #### 5. Favorites View Not Updated on Unfavorite
 **Location:** `src/app.rs:860-875`

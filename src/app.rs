@@ -7,7 +7,18 @@ use log::{debug, error, info};
 use reqwest;
 use rss::Channel;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, error, fs, path::PathBuf, time::SystemTime};
+use std::{collections::HashSet, error, fs, path::PathBuf, time::Duration, time::SystemTime};
+
+/// Default HTTP request timeout in seconds
+const HTTP_TIMEOUT_SECS: u64 = 30;
+
+/// Creates a reqwest client with a configured timeout to prevent hanging on slow/unresponsive feeds
+fn create_http_client() -> reqwest::Client {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(HTTP_TIMEOUT_SECS))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new())
+}
 
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
@@ -371,7 +382,8 @@ impl App {
         }
 
         // Try to fetch and parse the feed
-        match reqwest::get(url.as_str()).await {
+        let client = create_http_client();
+        match client.get(url.as_str()).send().await {
             Ok(response) => {
                 let bytes = response.bytes().await?;
                 // Try RSS first
@@ -435,7 +447,8 @@ impl App {
                 }
 
                 debug!("Fetching feed content from URL: {}", url);
-                let response = reqwest::get(url).await?;
+                let client = create_http_client();
+                let response = client.get(url).send().await?;
                 let content = response.bytes().await?;
 
                 let mut feed_items: Vec<FeedItem> = match Channel::read_from(&content[..]) {
@@ -730,7 +743,8 @@ impl App {
             }
 
             debug!("Fetching feed content from URL: {}", url);
-            match reqwest::get(&url).await {
+            let client = create_http_client();
+            match client.get(&url).send().await {
                 Ok(response) => {
                     if let Ok(content) = response.bytes().await {
                         // Try RSS first
@@ -778,9 +792,10 @@ impl App {
     pub async fn refresh_all_feeds(&mut self) -> AppResult<()> {
         let mut all_items = Vec::new();
 
+        let client = create_http_client();
         for url in &self.rss_feeds {
             debug!("Refreshing feed: {}", url);
-            match reqwest::get(url).await {
+            match client.get(url).send().await {
                 Ok(response) => {
                     let content = response.bytes().await?;
                     // Try RSS first
@@ -918,7 +933,8 @@ impl App {
 
 pub async fn fetch_feed(url: &str) -> AppResult<Vec<FeedItem>> {
     debug!("Fetching feed from URL: {}", url);
-    let response = reqwest::get(url).await?.bytes().await?;
+    let client = create_http_client();
+    let response = client.get(url).send().await?.bytes().await?;
 
     // Try parsing as RSS first
     match Channel::read_from(&response[..]) {

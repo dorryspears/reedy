@@ -2,6 +2,27 @@
 
 ## 2026-01-12
 
+### Fixed: High Bug #4 - No HTTP Request Timeouts
+
+**Location:** `src/app.rs` - multiple locations using `reqwest::get()`
+
+**Problem:** All HTTP requests using `reqwest::get()` lacked timeout configuration. When a feed server was slow or unresponsive, the application would hang indefinitely waiting for a response.
+
+**Solution:**
+1. Added a `create_http_client()` helper function that creates a `reqwest::Client` with a 30-second timeout
+2. Replaced all bare `reqwest::get()` calls with client-based requests using the new helper
+3. Added `Duration` to the imports for timeout configuration
+
+**Files changed:**
+- `src/app.rs` - Added `create_http_client()` function and updated 5 locations:
+  - `is_valid_rss_feed()`
+  - `load_feed_content()`
+  - `cache_all_feeds()`
+  - `refresh_all_feeds()`
+  - `fetch_feed()`
+
+**Tests:** All tests pass (13 total: 8 app tests, 5 ui tests)
+
 ### Fixed: High Bug #3 - Cache Cleared on Every Startup
 
 **Location:** `src/app.rs:103`
