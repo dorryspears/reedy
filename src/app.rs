@@ -2303,13 +2303,25 @@ impl App {
 
     fn load_feed_cache(&self, url: &str) -> Option<Vec<FeedItem>> {
         let cache_path = Self::get_cache_path(url);
-        if let Ok(content) = fs::read_to_string(cache_path) {
-            if let Ok(cache) = serde_json::from_str::<CachedFeed>(&content) {
-                // Check if cache is within the configured duration
-                let cache_duration_secs = self.config.cache_duration_mins * 60;
-                if let Ok(duration) = cache.last_updated.elapsed() {
-                    if duration.as_secs() < cache_duration_secs {
-                        return Some(cache.content);
+        if let Ok(content) = fs::read_to_string(&cache_path) {
+            match serde_json::from_str::<CachedFeed>(&content) {
+                Ok(cache) => {
+                    // Check if cache is within the configured duration
+                    let cache_duration_secs = self.config.cache_duration_mins * 60;
+                    if let Ok(duration) = cache.last_updated.elapsed() {
+                        if duration.as_secs() < cache_duration_secs {
+                            return Some(cache.content);
+                        }
+                    }
+                }
+                Err(e) => {
+                    // Cache file is corrupted, delete it
+                    error!(
+                        "Failed to parse cache file for {}: {}. Removing corrupted cache.",
+                        url, e
+                    );
+                    if let Err(e) = fs::remove_file(&cache_path) {
+                        error!("Failed to remove corrupted cache file: {}", e);
                     }
                 }
             }
