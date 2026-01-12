@@ -389,3 +389,42 @@ fn test_get_actual_index_with_filter() {
     assert_eq!(app.get_actual_index(1), Some(3));
     assert_eq!(app.get_actual_index(2), None); // Out of bounds in filtered list
 }
+
+#[test]
+fn test_start_importing_mode() {
+    let mut app = App::default();
+    assert_eq!(app.input_mode, InputMode::Normal);
+
+    // Start importing
+    app.start_importing();
+    assert_eq!(app.input_mode, InputMode::Importing);
+    assert!(app.import_result.is_none());
+    // Note: input_buffer may or may not be empty depending on clipboard state
+}
+
+#[test]
+fn test_cancel_importing() {
+    let mut app = App::default();
+
+    // Start importing and add some text
+    app.input_mode = InputMode::Importing;
+    app.input_buffer = "https://example.com/feed.xml".to_string();
+    app.import_result = Some("test".to_string());
+
+    // Cancel
+    app.cancel_importing();
+
+    assert_eq!(app.input_mode, InputMode::Normal);
+    assert!(app.input_buffer.is_empty());
+    assert!(app.import_result.is_none());
+}
+
+#[test]
+fn test_export_empty_feeds() {
+    let mut app = App::default();
+    assert!(app.rss_feeds.is_empty());
+
+    // Export should set an error message
+    app.export_feeds_to_clipboard();
+    assert_eq!(app.error_message, Some("No feeds to export".to_string()));
+}

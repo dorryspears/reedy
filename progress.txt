@@ -245,3 +245,52 @@ This pattern is inefficient and can cause deadlocks in certain scenarios because
 - `tests/app_tests.rs` - Added 3 new tests for search functionality
 
 **Tests:** All tests pass (20 total: 15 app tests, 5 ui tests)
+
+---
+
+### Implemented: High Priority Feature #2 - Feed Export/Import via Clipboard
+
+**Location:** `src/app.rs`, `src/handler.rs`, `src/ui.rs`
+
+**Description:** Added the ability to export and import feed subscriptions via the system clipboard. This allows users to easily backup, share, or migrate their feed subscriptions.
+
+**Implementation Details:**
+
+1. **New Dependency:** Added `arboard` crate (v3, default-features disabled) for cross-platform clipboard access
+
+2. **New InputMode:** Added `InputMode::Importing` to handle multi-line URL input
+
+3. **New App field:**
+   - `import_result: Option<String>` - stores the result message from import operation
+
+4. **New App methods:**
+   - `export_feeds_to_clipboard()` - copies all feed URLs to clipboard, one per line
+   - `start_importing()` - enters import mode, pre-fills input buffer with clipboard content
+   - `cancel_importing()` - cancels import mode and clears state
+   - `import_feeds()` - validates and imports feeds from input buffer
+
+5. **Key bindings (in Feed Manager mode):**
+   - `e` - Export all feed URLs to clipboard
+   - `i` - Start import mode (clipboard content auto-pasted)
+   - `Enter` - Confirm import and validate URLs
+   - `Esc` - Cancel import
+
+6. **Import behavior:**
+   - Parses input buffer as one URL per line
+   - Validates each URL as a valid RSS/Atom feed
+   - Skips duplicate URLs already in the feed list
+   - Shows summary message: "Import: X added, Y duplicate, Z invalid"
+
+7. **UI Updates:**
+   - Command bar shows export/import options: `[e] Export  [i] Import`
+   - Import mode shows URL count: "Import feeds (X URLs pasted) - [Enter] Import  [Esc] Cancel"
+   - Help menu updated with export/import documentation
+
+**Files changed:**
+- `Cargo.toml` - Added `arboard` dependency
+- `src/app.rs` - Added `InputMode::Importing`, `import_result` field, and export/import methods
+- `src/handler.rs` - Added `e` and `i` key bindings, `Importing` input mode handler
+- `src/ui.rs` - Updated command bar and help menu with export/import documentation
+- `tests/app_tests.rs` - Added 3 new tests for import functionality
+
+**Tests:** All tests pass (23 total: 18 app tests, 5 ui tests)

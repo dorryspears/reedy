@@ -30,6 +30,7 @@ pub enum InputMode {
     FeedManager,
     Help,
     Searching,
+    Importing,
 }
 
 #[derive(Debug, PartialEq)]
@@ -80,6 +81,7 @@ pub struct App {
     pub terminal_height: u16,
     pub search_query: String,
     pub filtered_indices: Option<Vec<usize>>,
+    pub import_result: Option<String>,
 }
 
 impl Default for App {
@@ -101,6 +103,7 @@ impl Default for App {
             terminal_height: 24,
             search_query: String::new(),
             filtered_indices: None,
+            import_result: None,
         }
     }
 }
@@ -387,6 +390,124 @@ impl App {
                 self.error_message = Some("Failed to save feeds".to_string());
             }
         }
+    }
+
+    /// Exports all feed URLs to the clipboard, one URL per line
+    pub fn export_feeds_to_clipboard(&mut self) {
+        if self.rss_feeds.is_empty() {
+            self.error_message = Some("No feeds to export".to_string());
+            return;
+        }
+
+        let feed_list = self.rss_feeds.join("\n");
+        match arboard::Clipboard::new() {
+            Ok(mut clipboard) => match clipboard.set_text(&feed_list) {
+                Ok(()) => {
+                    info!("Exported {} feeds to clipboard", self.rss_feeds.len());
+                    self.error_message = Some(format!("Exported {} feeds to clipboard", self.rss_feeds.len()));
+                }
+                Err(e) => {
+                    error!("Failed to copy to clipboard: {}", e);
+                    self.error_message = Some(format!("Failed to copy to clipboard: {}", e));
+                }
+            },
+            Err(e) => {
+                error!("Failed to access clipboard: {}", e);
+                self.error_message = Some(format!("Failed to access clipboard: {}", e));
+            }
+        }
+    }
+
+    /// Starts the import mode
+    pub fn start_importing(&mut self) {
+        self.input_mode = InputMode::Importing;
+        self.input_buffer.clear();
+        self.import_result = None;
+
+        // Try to pre-fill from clipboard
+        if let Ok(mut clipboard) = arboard::Clipboard::new() {
+            if let Ok(text) = clipboard.get_text() {
+                self.input_buffer = text;
+            }
+        }
+    }
+
+    /// Cancels the import mode
+    pub fn cancel_importing(&mut self) {
+        self.input_mode = InputMode::Normal;
+        self.input_buffer.clear();
+        self.import_result = None;
+        self.clear_error();
+    }
+
+    /// Imports feeds from the input buffer (one URL per line)
+    pub async fn import_feeds(&mut self) -> AppResult<()> {
+        let urls: Vec<String> = self
+            .input_buffer
+            .lines()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        if urls.is_empty() {
+            self.error_message = Some("No URLs to import".to_string());
+            return Ok(());
+        }
+
+        let mut added = 0;
+        let mut skipped_duplicate = 0;
+        let mut skipped_invalid = 0;
+
+        for url in urls {
+            // Skip duplicates
+            if self.rss_feeds.contains(&url) {
+                skipped_duplicate += 1;
+                continue;
+            }
+
+            // Validate the URL
+            match Self::is_valid_rss_feed(&url).await {
+                Ok(true) => {
+                    info!("Successfully validated and added feed: {}", url);
+                    self.rss_feeds.push(url);
+                    added += 1;
+                }
+                Ok(false) => {
+                    debug!("Invalid RSS feed URL during import: {}", url);
+                    skipped_invalid += 1;
+                }
+                Err(e) => {
+                    debug!("Error validating feed during import: {} - {}", url, e);
+                    skipped_invalid += 1;
+                }
+            }
+        }
+
+        // Save if we added any feeds
+        if added > 0 {
+            self.save_feeds()?;
+        }
+
+        // Build result message
+        let mut result_parts = Vec::new();
+        if added > 0 {
+            result_parts.push(format!("{} added", added));
+        }
+        if skipped_duplicate > 0 {
+            result_parts.push(format!("{} duplicate", skipped_duplicate));
+        }
+        if skipped_invalid > 0 {
+            result_parts.push(format!("{} invalid", skipped_invalid));
+        }
+
+        let result_msg = format!("Import: {}", result_parts.join(", "));
+        self.import_result = Some(result_msg.clone());
+        self.error_message = Some(result_msg);
+
+        self.input_mode = InputMode::Normal;
+        self.input_buffer.clear();
+
+        Ok(())
     }
 
     pub async fn is_valid_rss_feed(url: &str) -> AppResult<bool> {

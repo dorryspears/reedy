@@ -143,7 +143,7 @@ pub mod ui;
 - Filter indicator shows in title bar: `[Filter: "query"]`
 - All actions (open, read, favorite) work correctly with filtered items
 
-#### 2. Feed Export/Import via Clipboard
+#### ~~2. Feed Export/Import via Clipboard~~ DONE
 **Description:** Simple feed list export and import using the clipboard.
 - **Export (`e` key in Feed Manager):** Copies all feed URLs to clipboard, one URL per line
 - **Import (`i` key in Feed Manager):** Opens a text input where users can paste feed URLs (one per line), validates each URL, and adds valid feeds
@@ -156,6 +156,13 @@ https://news.site.com/atom.xml
 ```
 
 **Value:** Quick and easy way to backup, share, or migrate feed subscriptions without complex file formats.
+
+**Implementation:**
+- Press `e` in Feed Manager to export all feed URLs to clipboard
+- Press `i` in Feed Manager to start import mode (clipboard content auto-pasted)
+- Press `Enter` to validate and import feeds, `Esc` to cancel
+- Import validates each URL as valid RSS/Atom feed
+- Skips duplicates and invalid URLs with informative message
 
 #### 3. OPML Import/Export (Optional)
 **Description:** Support importing and exporting feed lists in OPML format (industry standard).

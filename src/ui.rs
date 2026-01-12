@@ -326,6 +326,8 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
             )]),
             Line::from("a              - Add new feed"),
             Line::from("d              - Delete selected feed"),
+            Line::from("e              - Export feeds to clipboard"),
+            Line::from("i              - Import feeds from clipboard"),
             Line::from("c              - Refresh feed cache"),
             Line::from("m              - Return to feed list"),
             Line::from("?              - Toggle this help menu"),
@@ -424,11 +426,15 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
             }
             PageMode::FeedManager => match app.input_mode {
                 InputMode::Normal => {
-                    "[↑↓] Navigate  [g] Top  [a] Add Feed  [d] Delete Feed  [m] Back to Feeds  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [a] Add  [d] Delete  [e] Export  [i] Import  [m] Back  [?] Help  [q] Quit".to_string()
                 }
                 InputMode::Adding => format!("Enter RSS URL: {}", app.input_buffer),
                 InputMode::Deleting => {
                     "Use ↑↓ to select feed, Enter to delete, Esc to cancel".to_string()
+                }
+                InputMode::Importing => {
+                    let line_count = app.input_buffer.lines().count();
+                    format!("Import feeds ({} URLs pasted) - [Enter] Import  [Esc] Cancel", line_count)
                 }
                 InputMode::FeedManager => "[m] Back to Feeds  [?] Help".to_string(),
                 InputMode::Help | InputMode::Searching => unreachable!(), // These cases are already handled above

@@ -126,6 +126,12 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 KeyCode::Char('c') => {
                     app.cache_all_feeds().await;
                 }
+                KeyCode::Char('e') => {
+                    app.export_feeds_to_clipboard();
+                }
+                KeyCode::Char('i') => {
+                    app.start_importing();
+                }
                 KeyCode::Enter => {
                     if let Some(index) = app.selected_index {
                         app.select_feed(index).await?;
@@ -198,6 +204,21 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 KeyCode::Down | KeyCode::Char('j') => {
                     app.select_next();
                     app.ensure_selection_visible();
+                }
+                _ => {}
+            },
+            InputMode::Importing => match key_event.code {
+                KeyCode::Enter => {
+                    app.import_feeds().await?;
+                }
+                KeyCode::Esc => {
+                    app.cancel_importing();
+                }
+                KeyCode::Char(c) => {
+                    app.input_buffer.push(c);
+                }
+                KeyCode::Backspace => {
+                    app.input_buffer.pop();
                 }
                 _ => {}
             },
