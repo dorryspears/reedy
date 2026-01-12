@@ -382,9 +382,35 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeC
     }
 }
 
+/// Formats a keybinding string for display in the help menu.
+/// Converts "k,Up" to "↑/k", "PageUp" to "PgUp", etc.
+fn format_keybinding(keybinding: &str) -> String {
+    let keys: Vec<&str> = keybinding.split(',').collect();
+    let formatted: Vec<String> = keys
+        .iter()
+        .map(|k| {
+            let k = k.trim();
+            match k.to_lowercase().as_str() {
+                "up" => "↑".to_string(),
+                "down" => "↓".to_string(),
+                "left" => "←".to_string(),
+                "right" => "→".to_string(),
+                "pageup" | "pgup" => "PgUp".to_string(),
+                "pagedown" | "pgdn" | "pgdown" => "PgDn".to_string(),
+                "enter" | "return" => "Enter".to_string(),
+                "esc" | "escape" => "Esc".to_string(),
+                "space" => "Space".to_string(),
+                _ => k.to_string(),
+            }
+        })
+        .collect();
+    formatted.join("/")
+}
+
 /// Renders the help menu with all available commands based on the current page mode
 fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColors) {
     let title = "Help - Available Commands";
+    let kb = &app.config.keybindings;
 
     // Create the help text based on the current page mode
     let help_text = match app.page_mode {
@@ -402,11 +428,26 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(colors.secondary),
             )]),
-            Line::from("↑/k, ↓/j      - Navigate between feed items"),
-            Line::from("PgUp, PgDown   - Scroll page up/down"),
-            Line::from("g              - Scroll to top of feed"),
-            Line::from("G              - Scroll to bottom of feed"),
-            Line::from("Enter          - Read selected feed"),
+            Line::from(format!(
+                "{:<14} - Navigate between feed items",
+                format_keybinding(&kb.move_up) + ", " + &format_keybinding(&kb.move_down)
+            )),
+            Line::from(format!(
+                "{:<14} - Scroll page up/down",
+                format_keybinding(&kb.page_up) + ", " + &format_keybinding(&kb.page_down)
+            )),
+            Line::from(format!(
+                "{:<14} - Scroll to top of feed",
+                format_keybinding(&kb.scroll_to_top)
+            )),
+            Line::from(format!(
+                "{:<14} - Scroll to bottom of feed",
+                format_keybinding(&kb.scroll_to_bottom)
+            )),
+            Line::from(format!(
+                "{:<14} - Read selected feed",
+                format_keybinding(&kb.select)
+            )),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "Search",
@@ -414,7 +455,10 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(colors.secondary),
             )]),
-            Line::from("/              - Start search/filter"),
+            Line::from(format!(
+                "{:<14} - Start search/filter",
+                format_keybinding(&kb.start_search)
+            )),
             Line::from("Esc            - Clear search filter (when active)"),
             Line::from(""),
             Line::from(vec![Span::styled(
@@ -423,16 +467,46 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(colors.secondary),
             )]),
-            Line::from("p              - Open article preview pane"),
-            Line::from("o              - Open selected item in browser"),
-            Line::from("r              - Toggle read status of selected item"),
-            Line::from("R              - Mark all items as read"),
-            Line::from("f              - Toggle favorite status of selected item"),
-            Line::from("F              - Toggle favorites view"),
-            Line::from("m              - Open feed manager"),
-            Line::from("c              - Refresh feed cache"),
-            Line::from("?              - Toggle this help menu"),
-            Line::from("q              - Quit application"),
+            Line::from(format!(
+                "{:<14} - Open article preview pane",
+                format_keybinding(&kb.open_preview)
+            )),
+            Line::from(format!(
+                "{:<14} - Open selected item in browser",
+                format_keybinding(&kb.open_in_browser)
+            )),
+            Line::from(format!(
+                "{:<14} - Toggle read status of selected item",
+                format_keybinding(&kb.toggle_read)
+            )),
+            Line::from(format!(
+                "{:<14} - Mark all items as read",
+                format_keybinding(&kb.mark_all_read)
+            )),
+            Line::from(format!(
+                "{:<14} - Toggle favorite status of selected item",
+                format_keybinding(&kb.toggle_favorite)
+            )),
+            Line::from(format!(
+                "{:<14} - Toggle favorites view",
+                format_keybinding(&kb.toggle_favorites_view)
+            )),
+            Line::from(format!(
+                "{:<14} - Open feed manager",
+                format_keybinding(&kb.open_feed_manager)
+            )),
+            Line::from(format!(
+                "{:<14} - Refresh feed cache",
+                format_keybinding(&kb.refresh)
+            )),
+            Line::from(format!(
+                "{:<14} - Toggle this help menu",
+                format_keybinding(&kb.help)
+            )),
+            Line::from(format!(
+                "{:<14} - Quit application",
+                format_keybinding(&kb.quit)
+            )),
         ],
         PageMode::FeedManager => vec![
             Line::from(vec![Span::styled(
@@ -448,10 +522,22 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(colors.secondary),
             )]),
-            Line::from("↑/k, ↓/j      - Navigate between feeds"),
-            Line::from("g              - Scroll to top of feed list"),
-            Line::from("G              - Scroll to bottom of feed list"),
-            Line::from("Enter          - Select feed and return to feed list"),
+            Line::from(format!(
+                "{:<14} - Navigate between feeds",
+                format_keybinding(&kb.move_up) + ", " + &format_keybinding(&kb.move_down)
+            )),
+            Line::from(format!(
+                "{:<14} - Scroll to top of feed list",
+                format_keybinding(&kb.scroll_to_top)
+            )),
+            Line::from(format!(
+                "{:<14} - Scroll to bottom of feed list",
+                format_keybinding(&kb.scroll_to_bottom)
+            )),
+            Line::from(format!(
+                "{:<14} - Select feed and return to feed list",
+                format_keybinding(&kb.select)
+            )),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "Actions",
@@ -459,17 +545,50 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(colors.secondary),
             )]),
-            Line::from("a              - Add new feed"),
-            Line::from("d              - Delete selected feed"),
-            Line::from("t              - Set category/tag for selected feed"),
-            Line::from("e              - Export feeds to clipboard"),
-            Line::from("E              - Export feeds to OPML file"),
-            Line::from("i              - Import feeds from clipboard"),
-            Line::from("I              - Import feeds from OPML file"),
-            Line::from("c              - Refresh feed cache"),
-            Line::from("m              - Return to feed list"),
-            Line::from("?              - Toggle this help menu"),
-            Line::from("q/Esc          - Quit application"),
+            Line::from(format!(
+                "{:<14} - Add new feed",
+                format_keybinding(&kb.add_feed)
+            )),
+            Line::from(format!(
+                "{:<14} - Delete selected feed",
+                format_keybinding(&kb.delete_feed)
+            )),
+            Line::from(format!(
+                "{:<14} - Set category/tag for selected feed",
+                format_keybinding(&kb.set_category)
+            )),
+            Line::from(format!(
+                "{:<14} - Export feeds to clipboard",
+                format_keybinding(&kb.export_clipboard)
+            )),
+            Line::from(format!(
+                "{:<14} - Export feeds to OPML file",
+                format_keybinding(&kb.export_opml)
+            )),
+            Line::from(format!(
+                "{:<14} - Import feeds from clipboard",
+                format_keybinding(&kb.import_clipboard)
+            )),
+            Line::from(format!(
+                "{:<14} - Import feeds from OPML file",
+                format_keybinding(&kb.import_opml)
+            )),
+            Line::from(format!(
+                "{:<14} - Refresh feed cache",
+                format_keybinding(&kb.refresh)
+            )),
+            Line::from(format!(
+                "{:<14} - Return to feed list",
+                format_keybinding(&kb.open_feed_manager)
+            )),
+            Line::from(format!(
+                "{:<14} - Toggle this help menu",
+                format_keybinding(&kb.help)
+            )),
+            Line::from(format!(
+                "{:<14} - Quit application",
+                format_keybinding(&kb.quit) + "/Esc"
+            )),
         ],
         PageMode::Favorites => vec![
             Line::from(vec![Span::styled(
@@ -485,10 +604,22 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(colors.secondary),
             )]),
-            Line::from("↑/k, ↓/j      - Navigate between favorite items"),
-            Line::from("PgUp, PgDown   - Scroll page up/down"),
-            Line::from("g              - Scroll to top of feed"),
-            Line::from("G              - Scroll to bottom of feed"),
+            Line::from(format!(
+                "{:<14} - Navigate between favorite items",
+                format_keybinding(&kb.move_up) + ", " + &format_keybinding(&kb.move_down)
+            )),
+            Line::from(format!(
+                "{:<14} - Scroll page up/down",
+                format_keybinding(&kb.page_up) + ", " + &format_keybinding(&kb.page_down)
+            )),
+            Line::from(format!(
+                "{:<14} - Scroll to top of feed",
+                format_keybinding(&kb.scroll_to_top)
+            )),
+            Line::from(format!(
+                "{:<14} - Scroll to bottom of feed",
+                format_keybinding(&kb.scroll_to_bottom)
+            )),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "Search",
@@ -496,7 +627,10 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(colors.secondary),
             )]),
-            Line::from("/              - Start search/filter"),
+            Line::from(format!(
+                "{:<14} - Start search/filter",
+                format_keybinding(&kb.start_search)
+            )),
             Line::from("Esc            - Clear search filter (when active)"),
             Line::from(""),
             Line::from(vec![Span::styled(
@@ -505,12 +639,30 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(colors.secondary),
             )]),
-            Line::from("p              - Open article preview pane"),
-            Line::from("o              - Open selected item in browser"),
-            Line::from("f              - Remove item from favorites"),
-            Line::from("F              - Return to all feeds view"),
-            Line::from("?              - Toggle this help menu"),
-            Line::from("q              - Quit application"),
+            Line::from(format!(
+                "{:<14} - Open article preview pane",
+                format_keybinding(&kb.open_preview)
+            )),
+            Line::from(format!(
+                "{:<14} - Open selected item in browser",
+                format_keybinding(&kb.open_in_browser)
+            )),
+            Line::from(format!(
+                "{:<14} - Remove item from favorites",
+                format_keybinding(&kb.toggle_favorite)
+            )),
+            Line::from(format!(
+                "{:<14} - Return to all feeds view",
+                format_keybinding(&kb.toggle_favorites_view)
+            )),
+            Line::from(format!(
+                "{:<14} - Toggle this help menu",
+                format_keybinding(&kb.help)
+            )),
+            Line::from(format!(
+                "{:<14} - Quit application",
+                format_keybinding(&kb.quit)
+            )),
         ],
     };
 

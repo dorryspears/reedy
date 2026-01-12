@@ -890,3 +890,106 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (45 total: 34 app tests, 11 ui tests)
 
+---
+
+### Implemented: Low Priority Feature #12 - Keyboard Shortcuts Customization
+
+**Location:** `src/app.rs`, `src/handler.rs`, `src/ui.rs`
+
+**Description:** Added the ability for users to configure their own keybindings via the config file. This allows power users to optimize their workflow by customizing keys to match their preferences or muscle memory from other applications.
+
+**Implementation Details:**
+
+1. **New Keybindings struct:** Added `Keybindings` struct in `app.rs` with 24 customizable key actions:
+   - Navigation: `move_up`, `move_down`, `page_up`, `page_down`, `scroll_to_top`, `scroll_to_bottom`
+   - Actions: `select`, `open_in_browser`, `toggle_read`, `mark_all_read`, `toggle_favorite`, `toggle_favorites_view`, `refresh`
+   - Search: `start_search`
+   - Preview: `open_preview`
+   - Feed Manager: `open_feed_manager`, `add_feed`, `delete_feed`, `set_category`, `export_clipboard`, `export_opml`, `import_clipboard`, `import_opml`
+   - UI: `help`, `quit`
+
+2. **Multi-key support:** Each keybinding field is a comma-separated string supporting multiple keys:
+   - Example: `"k,Up"` means both 'k' and Up arrow trigger the action
+   - Default vim-style bindings: navigation uses both vim keys (hjkl) and arrow keys
+
+3. **Key parser function:** Created `parse_key()` in `handler.rs` that converts key strings to `KeyCode`:
+   - Supports special keys: Enter, Esc, Up, Down, Left, Right, PageUp, PageDown, Home, End, Tab, Space, Backspace, Delete
+   - Supports single character keys (case-sensitive for letters)
+   - Supports alternative spellings (e.g., "PgUp" and "PageUp")
+
+4. **Key matching function:** Created `key_matches()` to check if a key event matches any key in a keybinding string
+
+5. **Handler refactoring:** Converted all hardcoded `KeyCode` matches in `handler.rs` to use `key_matches()` with the configurable keybindings:
+   - FeedList mode: all keys customizable
+   - FeedManager mode: all keys customizable
+   - Favorites mode: all keys customizable
+   - Preview mode: all keys customizable
+   - Text input modes (Adding, Importing, SettingCategory): remain hardcoded (Enter/Esc/Char/Backspace)
+
+6. **Dynamic help menu:** Updated `render_help_menu()` in `ui.rs` to display configured keybindings:
+   - Added `format_keybinding()` helper to convert key strings to display format
+   - Converts "Up" to "↑", "PageUp" to "PgUp", etc.
+   - Shows multiple keys joined with "/" (e.g., "k/↑")
+
+7. **Config integration:** Added `keybindings` field to `Config` struct with `#[serde(default)]` for backwards compatibility
+
+8. **Backwards compatibility:**
+   - All keybinding fields have default functions providing vim-style bindings
+   - Existing config files without keybindings work perfectly
+   - Partial keybinding configs work (missing fields use defaults)
+
+**Example config.json with custom keybindings:**
+```json
+{
+  "http_timeout_secs": 30,
+  "auto_refresh_mins": 5,
+  "keybindings": {
+    "move_up": "w,Up",
+    "move_down": "s,Down",
+    "quit": "x,q",
+    "toggle_favorite": "b"
+  }
+}
+```
+
+**Customizable Keys:**
+| Key | Default | Description |
+|-----|---------|-------------|
+| `move_up` | `k,Up` | Navigate up |
+| `move_down` | `j,Down` | Navigate down |
+| `page_up` | `PageUp` | Page up |
+| `page_down` | `PageDown` | Page down |
+| `scroll_to_top` | `g` | Go to top |
+| `scroll_to_bottom` | `G` | Go to bottom |
+| `select` | `Enter` | Select item |
+| `open_in_browser` | `o` | Open in browser |
+| `toggle_read` | `r` | Toggle read status |
+| `mark_all_read` | `R` | Mark all as read |
+| `toggle_favorite` | `f` | Toggle favorite |
+| `toggle_favorites_view` | `F` | Show/hide favorites |
+| `refresh` | `c` | Refresh feeds |
+| `start_search` | `/` | Start search |
+| `open_preview` | `p` | Open preview pane |
+| `open_feed_manager` | `m` | Open feed manager |
+| `add_feed` | `a` | Add new feed |
+| `delete_feed` | `d` | Delete feed |
+| `set_category` | `t` | Set category |
+| `export_clipboard` | `e` | Export to clipboard |
+| `export_opml` | `E` | Export to OPML |
+| `import_clipboard` | `i` | Import from clipboard |
+| `import_opml` | `I` | Import from OPML |
+| `help` | `?` | Toggle help |
+| `quit` | `q` | Quit |
+
+**Files changed:**
+- `src/app.rs` - Added `Keybindings` struct with 24 fields, default functions, Default impl, added to Config struct
+- `src/handler.rs` - Added `parse_key()`, `key_matches()`, `keys()` helper functions; refactored `handle_key_events()` to use configurable keybindings
+- `src/ui.rs` - Added `format_keybinding()` helper; updated `render_help_menu()` to display configured keybindings
+- `tests/app_tests.rs` - Added 4 new tests:
+  - `test_keybindings_default` - verifies all default keybinding values
+  - `test_config_includes_keybindings` - verifies keybindings in Config
+  - `test_keybindings_serialization` - tests JSON round-trip
+  - `test_keybindings_partial_config` - tests partial JSON with defaults
+
+**Tests:** All tests pass (49 total: 38 app tests, 11 ui tests)
+

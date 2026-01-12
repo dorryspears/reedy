@@ -840,3 +840,83 @@ fn test_export_opml_empty_feeds() {
     assert!(app.error_message.is_some());
     assert!(app.error_message.as_ref().unwrap().contains("No feeds to export"));
 }
+
+// Keybindings tests
+
+#[test]
+fn test_keybindings_default() {
+    use reedy::app::Keybindings;
+
+    let kb = Keybindings::default();
+
+    // Verify default keybindings match expected vim-style keys
+    assert_eq!(kb.move_up, "k,Up");
+    assert_eq!(kb.move_down, "j,Down");
+    assert_eq!(kb.page_up, "PageUp");
+    assert_eq!(kb.page_down, "PageDown");
+    assert_eq!(kb.scroll_to_top, "g");
+    assert_eq!(kb.scroll_to_bottom, "G");
+    assert_eq!(kb.select, "Enter");
+    assert_eq!(kb.open_in_browser, "o");
+    assert_eq!(kb.toggle_read, "r");
+    assert_eq!(kb.mark_all_read, "R");
+    assert_eq!(kb.toggle_favorite, "f");
+    assert_eq!(kb.toggle_favorites_view, "F");
+    assert_eq!(kb.refresh, "c");
+    assert_eq!(kb.start_search, "/");
+    assert_eq!(kb.open_preview, "p");
+    assert_eq!(kb.open_feed_manager, "m");
+    assert_eq!(kb.add_feed, "a");
+    assert_eq!(kb.delete_feed, "d");
+    assert_eq!(kb.set_category, "t");
+    assert_eq!(kb.export_clipboard, "e");
+    assert_eq!(kb.export_opml, "E");
+    assert_eq!(kb.import_clipboard, "i");
+    assert_eq!(kb.import_opml, "I");
+    assert_eq!(kb.help, "?");
+    assert_eq!(kb.quit, "q");
+}
+
+#[test]
+fn test_config_includes_keybindings() {
+    use reedy::app::Config;
+
+    let config = Config::default();
+
+    // Config should include default keybindings
+    assert_eq!(config.keybindings.move_up, "k,Up");
+    assert_eq!(config.keybindings.quit, "q");
+}
+
+#[test]
+fn test_keybindings_serialization() {
+    use reedy::app::Keybindings;
+
+    let kb = Keybindings::default();
+
+    // Serialize to JSON
+    let json = serde_json::to_string(&kb).unwrap();
+
+    // Deserialize back
+    let kb2: Keybindings = serde_json::from_str(&json).unwrap();
+
+    // Should match original
+    assert_eq!(kb, kb2);
+}
+
+#[test]
+fn test_keybindings_partial_config() {
+    use reedy::app::Keybindings;
+
+    // Test that partial JSON deserializes with defaults for missing fields
+    let json = r#"{"move_up": "w,Up", "quit": "x"}"#;
+    let kb: Keybindings = serde_json::from_str(json).unwrap();
+
+    // Custom values
+    assert_eq!(kb.move_up, "w,Up");
+    assert_eq!(kb.quit, "x");
+
+    // Defaults for missing values
+    assert_eq!(kb.move_down, "j,Down");
+    assert_eq!(kb.toggle_favorite, "f");
+}

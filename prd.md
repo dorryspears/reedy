@@ -287,9 +287,18 @@ https://news.site.com/atom.xml
 
 ### Low Priority
 
-#### 12. Keyboard Shortcuts Customization
+#### ~~12. Keyboard Shortcuts Customization~~ DONE
 **Description:** Allow users to configure their own keybindings via config file.
 **Value:** Power users can optimize their workflow.
+
+**Implementation:**
+- Added `Keybindings` struct with 24 customizable key actions
+- Keybindings stored in `~/.config/reedy/config.json` under the `keybindings` field
+- Each keybinding supports multiple keys via comma separation (e.g., "k,Up" for both 'k' and Up arrow)
+- Key parser supports special keys: Enter, Esc, Up, Down, Left, Right, PageUp, PageDown, Home, End, Tab, Space, Backspace, Delete
+- All navigation, action, and UI keys are customizable except text input modes
+- Help menu dynamically displays configured keybindings
+- Full backwards compatibility: missing keybinding fields use vim-style defaults
 
 #### 13. Vi-Style Commands
 **Description:** Support command mode with `:q`, `:w`, `:wq` style commands.
@@ -339,12 +348,16 @@ https://news.site.com/atom.xml
 
 ---
 
-## Configuration File (Future)
+## Configuration File
 
-Consider adding a `~/.config/reedy/config.toml` for:
-- Cache duration
-- HTTP timeout
-- Default keybindings
-- Theme/colors
-- Auto-refresh interval
+The application uses `~/.config/reedy/config.json` for user configuration:
+
+**Currently Implemented:**
+- ~~Cache duration~~ ✓ (`cache_duration_mins`)
+- ~~HTTP timeout~~ ✓ (`http_timeout_secs`)
+- ~~Default keybindings~~ ✓ (`keybindings` object with 24 customizable keys)
+- ~~Theme/colors~~ ✓ (`theme` object with 8 color fields)
+- ~~Auto-refresh interval~~ ✓ (`auto_refresh_mins`)
+
+**Future:**
 - Notification preferences

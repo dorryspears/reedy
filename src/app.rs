@@ -113,6 +113,184 @@ impl Theme {
     }
 }
 
+/// Customizable keyboard shortcuts
+/// Each field contains a comma-separated list of keys that trigger the action.
+/// Supported formats: single characters (e.g., "j"), special keys (e.g., "Up", "Enter", "Esc"),
+/// and multiple keys (e.g., "j,Down" for vim-style + arrow key navigation).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Keybindings {
+    // Navigation
+    #[serde(default = "default_move_up")]
+    pub move_up: String,
+    #[serde(default = "default_move_down")]
+    pub move_down: String,
+    #[serde(default = "default_page_up")]
+    pub page_up: String,
+    #[serde(default = "default_page_down")]
+    pub page_down: String,
+    #[serde(default = "default_scroll_to_top")]
+    pub scroll_to_top: String,
+    #[serde(default = "default_scroll_to_bottom")]
+    pub scroll_to_bottom: String,
+
+    // Actions
+    #[serde(default = "default_select")]
+    pub select: String,
+    #[serde(default = "default_open_in_browser")]
+    pub open_in_browser: String,
+    #[serde(default = "default_toggle_read")]
+    pub toggle_read: String,
+    #[serde(default = "default_mark_all_read")]
+    pub mark_all_read: String,
+    #[serde(default = "default_toggle_favorite")]
+    pub toggle_favorite: String,
+    #[serde(default = "default_toggle_favorites_view")]
+    pub toggle_favorites_view: String,
+    #[serde(default = "default_refresh")]
+    pub refresh: String,
+
+    // Search
+    #[serde(default = "default_start_search")]
+    pub start_search: String,
+
+    // Preview
+    #[serde(default = "default_open_preview")]
+    pub open_preview: String,
+
+    // Feed Manager
+    #[serde(default = "default_open_feed_manager")]
+    pub open_feed_manager: String,
+    #[serde(default = "default_add_feed")]
+    pub add_feed: String,
+    #[serde(default = "default_delete_feed")]
+    pub delete_feed: String,
+    #[serde(default = "default_set_category")]
+    pub set_category: String,
+    #[serde(default = "default_export_clipboard")]
+    pub export_clipboard: String,
+    #[serde(default = "default_export_opml")]
+    pub export_opml: String,
+    #[serde(default = "default_import_clipboard")]
+    pub import_clipboard: String,
+    #[serde(default = "default_import_opml")]
+    pub import_opml: String,
+
+    // UI
+    #[serde(default = "default_help")]
+    pub help: String,
+    #[serde(default = "default_quit")]
+    pub quit: String,
+}
+
+// Default keybinding functions
+fn default_move_up() -> String {
+    "k,Up".to_string()
+}
+fn default_move_down() -> String {
+    "j,Down".to_string()
+}
+fn default_page_up() -> String {
+    "PageUp".to_string()
+}
+fn default_page_down() -> String {
+    "PageDown".to_string()
+}
+fn default_scroll_to_top() -> String {
+    "g".to_string()
+}
+fn default_scroll_to_bottom() -> String {
+    "G".to_string()
+}
+fn default_select() -> String {
+    "Enter".to_string()
+}
+fn default_open_in_browser() -> String {
+    "o".to_string()
+}
+fn default_toggle_read() -> String {
+    "r".to_string()
+}
+fn default_mark_all_read() -> String {
+    "R".to_string()
+}
+fn default_toggle_favorite() -> String {
+    "f".to_string()
+}
+fn default_toggle_favorites_view() -> String {
+    "F".to_string()
+}
+fn default_refresh() -> String {
+    "c".to_string()
+}
+fn default_start_search() -> String {
+    "/".to_string()
+}
+fn default_open_preview() -> String {
+    "p".to_string()
+}
+fn default_open_feed_manager() -> String {
+    "m".to_string()
+}
+fn default_add_feed() -> String {
+    "a".to_string()
+}
+fn default_delete_feed() -> String {
+    "d".to_string()
+}
+fn default_set_category() -> String {
+    "t".to_string()
+}
+fn default_export_clipboard() -> String {
+    "e".to_string()
+}
+fn default_export_opml() -> String {
+    "E".to_string()
+}
+fn default_import_clipboard() -> String {
+    "i".to_string()
+}
+fn default_import_opml() -> String {
+    "I".to_string()
+}
+fn default_help() -> String {
+    "?".to_string()
+}
+fn default_quit() -> String {
+    "q".to_string()
+}
+
+impl Default for Keybindings {
+    fn default() -> Self {
+        Self {
+            move_up: default_move_up(),
+            move_down: default_move_down(),
+            page_up: default_page_up(),
+            page_down: default_page_down(),
+            scroll_to_top: default_scroll_to_top(),
+            scroll_to_bottom: default_scroll_to_bottom(),
+            select: default_select(),
+            open_in_browser: default_open_in_browser(),
+            toggle_read: default_toggle_read(),
+            mark_all_read: default_mark_all_read(),
+            toggle_favorite: default_toggle_favorite(),
+            toggle_favorites_view: default_toggle_favorites_view(),
+            refresh: default_refresh(),
+            start_search: default_start_search(),
+            open_preview: default_open_preview(),
+            open_feed_manager: default_open_feed_manager(),
+            add_feed: default_add_feed(),
+            delete_feed: default_delete_feed(),
+            set_category: default_set_category(),
+            export_clipboard: default_export_clipboard(),
+            export_opml: default_export_opml(),
+            import_clipboard: default_import_clipboard(),
+            import_opml: default_import_opml(),
+            help: default_help(),
+            quit: default_quit(),
+        }
+    }
+}
+
 /// Application configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -128,6 +306,9 @@ pub struct Config {
     /// Color theme (default: dark theme)
     #[serde(default)]
     pub theme: Theme,
+    /// Custom keyboard shortcuts (default: vim-style bindings)
+    #[serde(default)]
+    pub keybindings: Keybindings,
 }
 
 fn default_http_timeout() -> u64 {
@@ -149,6 +330,7 @@ impl Default for Config {
             auto_refresh_mins: DEFAULT_AUTO_REFRESH_MINS,
             cache_duration_mins: DEFAULT_CACHE_DURATION_MINS,
             theme: Theme::default(),
+            keybindings: Keybindings::default(),
         }
     }
 }

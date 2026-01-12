@@ -1,21 +1,70 @@
-use crate::app::{App, AppResult, InputMode, PageMode};
+use crate::app::{App, AppResult, InputMode, Keybindings, PageMode};
 use crossterm::event::{KeyCode, KeyEvent};
 use log::{debug, error};
+
+/// Parses a key string (like "Enter", "k", "Up", "PageDown") into a KeyCode.
+/// Returns None if the string is not a valid key.
+fn parse_key(key_str: &str) -> Option<KeyCode> {
+    let key_str = key_str.trim();
+    match key_str.to_lowercase().as_str() {
+        // Special keys
+        "enter" | "return" => Some(KeyCode::Enter),
+        "esc" | "escape" => Some(KeyCode::Esc),
+        "backspace" => Some(KeyCode::Backspace),
+        "tab" => Some(KeyCode::Tab),
+        "up" => Some(KeyCode::Up),
+        "down" => Some(KeyCode::Down),
+        "left" => Some(KeyCode::Left),
+        "right" => Some(KeyCode::Right),
+        "pageup" | "pgup" => Some(KeyCode::PageUp),
+        "pagedown" | "pgdn" | "pgdown" => Some(KeyCode::PageDown),
+        "home" => Some(KeyCode::Home),
+        "end" => Some(KeyCode::End),
+        "insert" => Some(KeyCode::Insert),
+        "delete" | "del" => Some(KeyCode::Delete),
+        "space" | " " => Some(KeyCode::Char(' ')),
+        // Single character - case sensitive for characters
+        s if s.len() == 1 => {
+            let c = key_str.chars().next()?;
+            Some(KeyCode::Char(c))
+        }
+        _ => None,
+    }
+}
+
+/// Checks if a key event matches any of the keys in a comma-separated keybinding string.
+/// Example: "k,Up" will match either 'k' or Up arrow.
+fn key_matches(key_event: &KeyEvent, keybinding: &str) -> bool {
+    for key_str in keybinding.split(',') {
+        if let Some(key_code) = parse_key(key_str) {
+            if key_event.code == key_code {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Helper to get keybindings from app
+fn keys(app: &App) -> &Keybindings {
+    &app.config.keybindings
+}
 
 /// Handles the key events and updates the state of [`App`].
 pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     // Handle help mode across all pages first
     if app.input_mode == InputMode::Help {
-        match key_event.code {
-            KeyCode::Char('q') | KeyCode::Esc | KeyCode::Char('?') => {
-                app.toggle_help();
-                return Ok(());
-            }
-            _ => return Ok(()),
+        // Help mode uses quit, Esc, and help keys to close
+        if key_matches(&key_event, &keys(app).quit)
+            || key_event.code == KeyCode::Esc
+            || key_matches(&key_event, &keys(app).help)
+        {
+            app.toggle_help();
         }
+        return Ok(());
     }
 
-    // Handle search mode
+    // Handle search mode - text input, not customizable
     if app.input_mode == InputMode::Searching {
         match key_event.code {
             KeyCode::Enter => {
@@ -39,156 +88,121 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
 
     // Handle preview mode
     if app.input_mode == InputMode::Preview {
-        match key_event.code {
-            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('p') => {
-                app.close_preview();
-            }
-            KeyCode::Up | KeyCode::Char('k') => {
-                app.preview_scroll_up();
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
-                app.preview_scroll_down();
-            }
-            KeyCode::PageUp => {
-                app.preview_page_up();
-            }
-            KeyCode::PageDown => {
-                app.preview_page_down();
-            }
-            KeyCode::Char('o') => {
-                app.open_selected_feed();
-            }
-            KeyCode::Char('r') => {
-                app.toggle_read_status();
-            }
-            KeyCode::Char('f') => {
-                app.toggle_favorite();
-            }
-            KeyCode::Char('g') => {
-                app.preview_scroll = 0;
-            }
-            KeyCode::Char('G') => {
-                // Set to max value; the UI will cap it to actual content length
-                app.preview_scroll = u16::MAX;
-            }
-            _ => {}
+        let kb = keys(app).clone();
+        if key_event.code == KeyCode::Esc
+            || key_matches(&key_event, &kb.quit)
+            || key_matches(&key_event, &kb.open_preview)
+        {
+            app.close_preview();
+        } else if key_matches(&key_event, &kb.move_up) {
+            app.preview_scroll_up();
+        } else if key_matches(&key_event, &kb.move_down) {
+            app.preview_scroll_down();
+        } else if key_matches(&key_event, &kb.page_up) {
+            app.preview_page_up();
+        } else if key_matches(&key_event, &kb.page_down) {
+            app.preview_page_down();
+        } else if key_matches(&key_event, &kb.open_in_browser) {
+            app.open_selected_feed();
+        } else if key_matches(&key_event, &kb.toggle_read) {
+            app.toggle_read_status();
+        } else if key_matches(&key_event, &kb.toggle_favorite) {
+            app.toggle_favorite();
+        } else if key_matches(&key_event, &kb.scroll_to_top) {
+            app.preview_scroll = 0;
+        } else if key_matches(&key_event, &kb.scroll_to_bottom) {
+            // Set to max value; the UI will cap it to actual content length
+            app.preview_scroll = u16::MAX;
         }
         return Ok(());
     }
 
+    // Clone keybindings to avoid borrow issues
+    let kb = keys(app).clone();
+
     match app.page_mode {
-        PageMode::FeedList => match key_event.code {
-            KeyCode::Char('q') => {
+        PageMode::FeedList => {
+            if key_matches(&key_event, &kb.quit) {
                 app.quit();
-            }
-            KeyCode::Esc => {
+            } else if key_event.code == KeyCode::Esc {
                 // If there's an active search filter, clear it; otherwise quit
                 if app.filtered_indices.is_some() {
                     app.clear_search();
                 } else {
                     app.quit();
                 }
-            }
-            KeyCode::Char('/') => {
+            } else if key_matches(&key_event, &kb.start_search) {
                 app.start_search();
-            }
-            KeyCode::Char('p') => {
+            } else if key_matches(&key_event, &kb.open_preview) {
                 app.open_preview();
-            }
-            KeyCode::Char('m') => {
+            } else if key_matches(&key_event, &kb.open_feed_manager) {
                 app.clear_search(); // Clear search when entering feed manager
                 app.toggle_feed_manager();
-            }
-            KeyCode::Char('o') => {
+            } else if key_matches(&key_event, &kb.open_in_browser) {
                 app.open_selected_feed();
-            }
-            KeyCode::Up | KeyCode::Char('k') => {
+            } else if key_matches(&key_event, &kb.move_up) {
                 app.select_previous();
-                // Using our centralized method to ensure selection is visible
                 app.ensure_selection_visible();
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
+            } else if key_matches(&key_event, &kb.move_down) {
                 app.select_next();
-                // Using our centralized method to ensure selection is visible
                 app.ensure_selection_visible();
-            }
-            KeyCode::Enter => {
+            } else if key_matches(&key_event, &kb.select) {
                 if let Some(index) = app.selected_index {
                     app.select_feed(index).await?;
                 }
-            }
-            KeyCode::Char('r') => {
+            } else if key_matches(&key_event, &kb.toggle_read) {
                 app.toggle_read_status();
-            }
-            KeyCode::Char('R') => {
+            } else if key_matches(&key_event, &kb.mark_all_read) {
                 app.mark_all_as_read();
-            }
-            KeyCode::PageUp => {
+            } else if key_matches(&key_event, &kb.page_up) {
                 app.page_up();
-            }
-            KeyCode::PageDown => {
+            } else if key_matches(&key_event, &kb.page_down) {
                 app.page_down();
-            }
-            KeyCode::Char('g') => {
+            } else if key_matches(&key_event, &kb.scroll_to_top) {
                 app.scroll_to_top();
-            }
-            KeyCode::Char('G') => {
+            } else if key_matches(&key_event, &kb.scroll_to_bottom) {
                 app.scroll_to_bottom();
-            }
-            KeyCode::Char('c') => {
+            } else if key_matches(&key_event, &kb.refresh) {
                 if let Err(e) = app.refresh_all_feeds().await {
                     error!("Failed to refresh feeds: {}", e);
                     app.error_message = Some(format!("Failed to refresh feeds: {}", e));
                 } else {
                     app.last_refresh = Some(std::time::SystemTime::now());
                 }
-            }
-            KeyCode::Char('f') => {
+            } else if key_matches(&key_event, &kb.toggle_favorite) {
                 app.toggle_favorite();
-            }
-            KeyCode::Char('F') => {
+            } else if key_matches(&key_event, &kb.toggle_favorites_view) {
                 app.clear_search(); // Clear search when toggling favorites
                 app.toggle_favorites_page().await;
-            }
-            KeyCode::Char('?') => {
+            } else if key_matches(&key_event, &kb.help) {
                 app.toggle_help();
             }
-            _ => {}
-        },
+        }
         PageMode::FeedManager => match app.input_mode {
-            InputMode::Normal => match key_event.code {
-                KeyCode::Char('q') | KeyCode::Esc => {
+            InputMode::Normal => {
+                if key_matches(&key_event, &kb.quit) || key_event.code == KeyCode::Esc {
                     app.quit();
-                }
-                KeyCode::Char('m') => {
+                } else if key_matches(&key_event, &kb.open_feed_manager) {
                     debug!("Are we logging?");
                     app.toggle_feed_manager();
-                }
-                KeyCode::Char('a') => {
+                } else if key_matches(&key_event, &kb.add_feed) {
                     app.start_adding();
-                }
-                KeyCode::Char('d') => {
+                } else if key_matches(&key_event, &kb.delete_feed) {
                     app.start_deleting();
-                }
-                KeyCode::Char('t') => {
+                } else if key_matches(&key_event, &kb.set_category) {
                     app.start_setting_category();
-                }
-                KeyCode::Char('c') => {
+                } else if key_matches(&key_event, &kb.refresh) {
                     app.cache_all_feeds().await;
-                }
-                KeyCode::Char('e') => {
+                } else if key_matches(&key_event, &kb.export_clipboard) {
                     app.export_feeds_to_clipboard();
-                }
-                KeyCode::Char('E') => {
+                } else if key_matches(&key_event, &kb.export_opml) {
                     // Export to OPML file
                     if let Err(e) = app.export_opml() {
                         error!("Failed to export OPML: {}", e);
                     }
-                }
-                KeyCode::Char('i') => {
+                } else if key_matches(&key_event, &kb.import_clipboard) {
                     app.start_importing();
-                }
-                KeyCode::Char('I') => {
+                } else if key_matches(&key_event, &kb.import_opml) {
                     // Import from OPML file
                     let opml_path = App::get_opml_path();
                     if opml_path.exists() {
@@ -197,10 +211,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                             app.error_message = Some(format!("Failed to import OPML: {}", e));
                         }
                     } else {
-                        app.error_message = Some(format!("OPML file not found: {}", opml_path.display()));
+                        app.error_message =
+                            Some(format!("OPML file not found: {}", opml_path.display()));
                     }
-                }
-                KeyCode::Enter => {
+                } else if key_matches(&key_event, &kb.select) {
                     if let Some(index) = app.selected_index {
                         app.select_feed(index).await?;
                         app.toggle_feed_manager();
@@ -209,45 +223,34 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                             app.scroll = 0; // Reset scroll position
                         }
                     }
-                }
-                KeyCode::Up | KeyCode::Char('k') => {
+                } else if key_matches(&key_event, &kb.move_up) {
                     app.select_previous();
-                    // Ensure selected item is visible
                     app.ensure_selection_visible();
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
+                } else if key_matches(&key_event, &kb.move_down) {
                     app.select_next();
-                    // Ensure selected item is visible
                     app.ensure_selection_visible();
-                }
-                KeyCode::Char('r') => {
+                } else if key_matches(&key_event, &kb.toggle_read) {
                     app.mark_as_read();
-                }
-                KeyCode::Char('R') => {
+                } else if key_matches(&key_event, &kb.mark_all_read) {
                     app.mark_all_as_read();
-                }
-                KeyCode::PageUp => {
+                } else if key_matches(&key_event, &kb.page_up) {
                     app.scroll_up();
-                }
-                KeyCode::PageDown => {
+                } else if key_matches(&key_event, &kb.page_down) {
                     app.scroll_down();
-                }
-                KeyCode::Char('g') => {
+                } else if key_matches(&key_event, &kb.scroll_to_top) {
                     app.scroll_to_top();
-                }
-                KeyCode::Char('G') => {
+                } else if key_matches(&key_event, &kb.scroll_to_bottom) {
                     app.scroll_to_bottom();
-                }
-                KeyCode::Char('?') => {
+                } else if key_matches(&key_event, &kb.help) {
                     app.toggle_help();
                 }
-                _ => {}
-            },
+            }
+            // Text input modes - not customizable (except navigation in Deleting mode)
             InputMode::Adding => match key_event.code {
                 KeyCode::Enter => {
                     app.add_feed().await?;
                 }
-                KeyCode::Char('q') | KeyCode::Esc => {
+                KeyCode::Esc => {
                     app.cancel_adding();
                 }
                 KeyCode::Char(c) => {
@@ -258,26 +261,22 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 }
                 _ => {}
             },
-            InputMode::Deleting => match key_event.code {
-                KeyCode::Enter => {
+            InputMode::Deleting => {
+                if key_event.code == KeyCode::Enter {
                     if let Some(index) = app.selected_index {
                         app.delete_feed(index);
                         app.cancel_deleting();
                     }
-                }
-                KeyCode::Esc => {
+                } else if key_event.code == KeyCode::Esc {
                     app.cancel_deleting();
-                }
-                KeyCode::Up | KeyCode::Char('k') => {
+                } else if key_matches(&key_event, &kb.move_up) {
                     app.select_previous();
                     app.ensure_selection_visible();
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
+                } else if key_matches(&key_event, &kb.move_down) {
                     app.select_next();
                     app.ensure_selection_visible();
                 }
-                _ => {}
-            },
+            }
             InputMode::Importing => match key_event.code {
                 KeyCode::Enter => {
                     app.import_feeds().await?;
@@ -310,61 +309,45 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             },
             _ => {}
         },
-        PageMode::Favorites => match key_event.code {
-            KeyCode::Char('q') => {
+        PageMode::Favorites => {
+            if key_matches(&key_event, &kb.quit) {
                 app.quit();
-            }
-            KeyCode::Esc => {
+            } else if key_event.code == KeyCode::Esc {
                 // If there's an active search filter, clear it; otherwise quit
                 if app.filtered_indices.is_some() {
                     app.clear_search();
                 } else {
                     app.quit();
                 }
-            }
-            KeyCode::Char('/') => {
+            } else if key_matches(&key_event, &kb.start_search) {
                 app.start_search();
-            }
-            KeyCode::Char('p') => {
+            } else if key_matches(&key_event, &kb.open_preview) {
                 app.open_preview();
-            }
-            KeyCode::Char('o') => {
+            } else if key_matches(&key_event, &kb.open_in_browser) {
                 app.open_selected_feed();
-            }
-            KeyCode::Up | KeyCode::Char('k') => {
+            } else if key_matches(&key_event, &kb.move_up) {
                 app.select_previous();
-                // Using our centralized method to ensure selection is visible
                 app.ensure_selection_visible();
-            }
-            KeyCode::Down | KeyCode::Char('j') => {
+            } else if key_matches(&key_event, &kb.move_down) {
                 app.select_next();
-                // Using our centralized method to ensure selection is visible
                 app.ensure_selection_visible();
-            }
-            KeyCode::Char('f') => {
+            } else if key_matches(&key_event, &kb.toggle_favorite) {
                 app.toggle_favorite();
-            }
-            KeyCode::Char('F') => {
+            } else if key_matches(&key_event, &kb.toggle_favorites_view) {
                 app.clear_search(); // Clear search when toggling favorites
                 app.toggle_favorites_page().await;
-            }
-            KeyCode::PageUp => {
+            } else if key_matches(&key_event, &kb.page_up) {
                 app.page_up();
-            }
-            KeyCode::PageDown => {
+            } else if key_matches(&key_event, &kb.page_down) {
                 app.page_down();
-            }
-            KeyCode::Char('g') => {
+            } else if key_matches(&key_event, &kb.scroll_to_top) {
                 app.scroll_to_top();
-            }
-            KeyCode::Char('G') => {
+            } else if key_matches(&key_event, &kb.scroll_to_bottom) {
                 app.scroll_to_bottom();
-            }
-            KeyCode::Char('?') => {
+            } else if key_matches(&key_event, &kb.help) {
                 app.toggle_help();
             }
-            _ => {}
-        },
+        }
     }
     Ok(())
 }
