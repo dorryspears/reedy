@@ -606,3 +606,101 @@ fn test_get_feeds_by_category() {
     assert_eq!(grouped[2].0, Some("Tech".to_string()));
     assert_eq!(grouped[2].1.len(), 2);
 }
+
+#[test]
+fn test_scroll_to_bottom() {
+    let mut app = App::default();
+
+    // Add 10 feed items
+    for i in 0..10 {
+        app.current_feed_content.push(FeedItem {
+            title: format!("Item {}", i),
+            description: format!("Description {}", i),
+            link: format!("https://example.com/{}", i),
+            published: Some(SystemTime::now()),
+            id: format!("id-{}", i),
+            feed_url: String::new(),
+        });
+    }
+
+    // Set selected to first item
+    app.selected_index = Some(0);
+    app.scroll = 0;
+    app.page_mode = PageMode::FeedList;
+    app.terminal_height = 30; // Set reasonable terminal height
+
+    // Scroll to bottom
+    app.scroll_to_bottom();
+
+    // Should select the last item (index 9)
+    assert_eq!(app.selected_index, Some(9));
+}
+
+#[test]
+fn test_scroll_to_bottom_empty_list() {
+    let mut app = App::default();
+
+    // No items, no selection
+    app.page_mode = PageMode::FeedList;
+
+    // Should not panic on empty list
+    app.scroll_to_bottom();
+
+    // Selected index should remain None
+    assert_eq!(app.selected_index, None);
+}
+
+#[test]
+fn test_scroll_to_bottom_feed_manager() {
+    let mut app = App::default();
+
+    // Add 5 feeds
+    for i in 0..5 {
+        app.rss_feeds.push(FeedInfo {
+            url: format!("https://example.com/{}.xml", i),
+            title: format!("Feed {}", i),
+            category: None,
+        });
+    }
+
+    app.selected_index = Some(0);
+    app.scroll = 0;
+    app.page_mode = PageMode::FeedManager;
+    app.terminal_height = 30;
+
+    // Scroll to bottom
+    app.scroll_to_bottom();
+
+    // Should select the last feed (index 4)
+    assert_eq!(app.selected_index, Some(4));
+}
+
+#[test]
+fn test_scroll_to_bottom_with_filter() {
+    let mut app = App::default();
+
+    // Add 10 feed items
+    for i in 0..10 {
+        app.current_feed_content.push(FeedItem {
+            title: format!("Item {}", i),
+            description: format!("Description {}", i),
+            link: format!("https://example.com/{}", i),
+            published: Some(SystemTime::now()),
+            id: format!("id-{}", i),
+            feed_url: String::new(),
+        });
+    }
+
+    // Set up a filter that only shows items 2, 5, 7
+    app.filtered_indices = Some(vec![2, 5, 7]);
+    app.selected_index = Some(0); // First visible item
+    app.scroll = 0;
+    app.page_mode = PageMode::FeedList;
+    app.terminal_height = 30;
+
+    // Scroll to bottom
+    app.scroll_to_bottom();
+
+    // Should select the last visible item (index 2 in visible list, which is actual index 7)
+    assert_eq!(app.selected_index, Some(2)); // Visible index, not actual
+}

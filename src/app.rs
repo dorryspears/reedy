@@ -1277,6 +1277,24 @@ impl App {
         }
     }
 
+    /// Scrolls to the bottom of the feed and selects the last item
+    pub fn scroll_to_bottom(&mut self) {
+        let len = match self.page_mode {
+            PageMode::FeedList | PageMode::Favorites => self.visible_item_count(),
+            PageMode::FeedManager => self.rss_feeds.len(),
+        };
+
+        if len == 0 {
+            return;
+        }
+
+        // Select the last item
+        self.selected_index = Some(len - 1);
+
+        // Ensure the selection is visible by scrolling to show it
+        self.ensure_selection_visible();
+    }
+
     /// Opens the article preview pane for the currently selected item
     pub fn open_preview(&mut self) {
         if let Some(visible_index) = self.selected_index {

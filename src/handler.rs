@@ -67,6 +67,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             KeyCode::Char('g') => {
                 app.preview_scroll = 0;
             }
+            KeyCode::Char('G') => {
+                // Set to max value; the UI will cap it to actual content length
+                app.preview_scroll = u16::MAX;
+            }
             _ => {}
         }
         return Ok(());
@@ -127,6 +131,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             }
             KeyCode::Char('g') => {
                 app.scroll_to_top();
+            }
+            KeyCode::Char('G') => {
+                app.scroll_to_bottom();
             }
             KeyCode::Char('c') => {
                 if let Err(e) = app.refresh_all_feeds().await {
@@ -209,6 +216,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 }
                 KeyCode::Char('g') => {
                     app.scroll_to_top();
+                }
+                KeyCode::Char('G') => {
+                    app.scroll_to_bottom();
                 }
                 KeyCode::Char('?') => {
                     app.toggle_help();
@@ -328,6 +338,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             }
             KeyCode::Char('g') => {
                 app.scroll_to_top();
+            }
+            KeyCode::Char('G') => {
+                app.scroll_to_bottom();
             }
             KeyCode::Char('?') => {
                 app.toggle_help();

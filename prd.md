@@ -305,9 +305,16 @@ https://news.site.com/atom.xml
 **Description:** Optionally auto-mark items as read when scrolling past them.
 **Value:** Reduces manual marking; common RSS reader feature.
 
-#### 19. Vim-Style `G` for Bottom
+#### ~~19. Vim-Style `G` for Bottom~~ DONE
 **Description:** Add `G` (shift+g) to scroll to the bottom of the list (complement to `g` for top).
 **Value:** Standard vim navigation pattern.
+
+**Implementation:**
+- Press `G` (shift+g) in FeedList, Favorites, or FeedManager to scroll to the bottom and select the last item
+- Works with filtered results (respects the visible item count when a search filter is active)
+- In article preview mode, `G` scrolls to the end of the article content
+- Complements the existing `g` command for scrolling to the top
+- Help menu updated with `G` documentation for all modes
 
 ---
 

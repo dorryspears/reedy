@@ -405,6 +405,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
             Line::from("↑/k, ↓/j      - Navigate between feed items"),
             Line::from("PgUp, PgDown   - Scroll page up/down"),
             Line::from("g              - Scroll to top of feed"),
+            Line::from("G              - Scroll to bottom of feed"),
             Line::from("Enter          - Read selected feed"),
             Line::from(""),
             Line::from(vec![Span::styled(
@@ -449,6 +450,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
             )]),
             Line::from("↑/k, ↓/j      - Navigate between feeds"),
             Line::from("g              - Scroll to top of feed list"),
+            Line::from("G              - Scroll to bottom of feed list"),
             Line::from("Enter          - Select feed and return to feed list"),
             Line::from(""),
             Line::from(vec![Span::styled(
@@ -484,6 +486,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
             Line::from("↑/k, ↓/j      - Navigate between favorite items"),
             Line::from("PgUp, PgDown   - Scroll page up/down"),
             Line::from("g              - Scroll to top of feed"),
+            Line::from("G              - Scroll to bottom of feed"),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "Search",

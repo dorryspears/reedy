@@ -779,3 +779,41 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (35 total: 24 app tests, 11 ui tests)
 
+---
+
+### Implemented: Low Priority Feature #19 - Vim-Style `G` for Bottom
+
+**Location:** `src/app.rs`, `src/handler.rs`, `src/ui.rs`
+
+**Description:** Added vim-style `G` (shift+g) command to scroll to the bottom of any list, complementing the existing `g` command that scrolls to the top. This follows standard vim navigation patterns that terminal users expect.
+
+**Implementation Details:**
+
+1. **New App method:** Added `scroll_to_bottom()` that:
+   - Determines the list length based on page mode (FeedList/Favorites use `visible_item_count()`, FeedManager uses `rss_feeds.len()`)
+   - Returns early if the list is empty (prevents panics)
+   - Selects the last item in the list
+   - Calls `ensure_selection_visible()` to scroll the view appropriately
+
+2. **Key bindings added:**
+   - `G` in FeedList mode - scrolls to bottom of feed items
+   - `G` in Favorites mode - scrolls to bottom of favorites list
+   - `G` in FeedManager Normal mode - scrolls to bottom of feed list
+   - `G` in Preview mode - scrolls to end of article content (sets `preview_scroll = u16::MAX`, which gets capped by the UI)
+
+3. **Filter support:** When a search filter is active, `scroll_to_bottom()` correctly navigates to the last *visible* item, not the last actual item.
+
+4. **Help menu updates:** Added `G` documentation to all three help sections (FeedList, FeedManager, Favorites).
+
+**Files changed:**
+- `src/app.rs` - Added `scroll_to_bottom()` method
+- `src/handler.rs` - Added `G` key bindings to FeedList, FeedManager, Favorites, and Preview modes
+- `src/ui.rs` - Updated help menus with `G` documentation for all modes
+- `tests/app_tests.rs` - Added 4 new tests:
+  - `test_scroll_to_bottom` - basic scroll to bottom functionality
+  - `test_scroll_to_bottom_empty_list` - verifies no panic on empty list
+  - `test_scroll_to_bottom_feed_manager` - works in FeedManager mode
+  - `test_scroll_to_bottom_with_filter` - respects active search filters
+
+**Tests:** All tests pass (39 total: 28 app tests, 11 ui tests)
+
