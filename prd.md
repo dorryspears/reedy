@@ -36,11 +36,13 @@ Reedy is a terminal-based RSS/Atom feed reader built with Rust. It provides a ke
 
 ### High
 
-#### 3. Cache Cleared on Every Startup
+#### ~~3. Cache Cleared on Every Startup~~ FIXED
 **Location:** `src/app.rs:103`
 **Description:** `clear_cache_dir()` is called on every startup, which defeats the purpose of caching feeds for offline reading.
 
 **Impact:** Users always wait for feeds to reload; no true offline support.
+
+**Fix:** Removed the `clear_cache_dir()` call from `App::new()`. The cache already has proper 1-hour TTL expiration logic in `load_feed_cache()`, so clearing on startup was unnecessary. Also removed the now-unused `clear_cache_dir()` function.
 
 #### 4. No HTTP Request Timeouts
 **Location:** `src/app.rs:371`, `src/app.rs:435`, `src/app.rs:730`, `src/app.rs:780`

@@ -99,9 +99,6 @@ impl App {
             app.terminal_height = height;
         }
 
-        // Clear the cache directory on startup
-        Self::clear_cache_dir();
-
         app.load_feeds().unwrap_or_else(|e| {
             error!("Failed to load feeds: {}", e);
             app.error_message = Some(format!("Failed to load feeds: {}", e));
@@ -845,18 +842,6 @@ impl App {
         self.save_state().unwrap_or_else(|e| {
             error!("Failed to save read status: {}", e);
         });
-    }
-
-    fn clear_cache_dir() {
-        let cache_dir = Self::get_cache_dir();
-        if cache_dir.exists() {
-            if let Err(e) = fs::remove_dir_all(&cache_dir) {
-                error!("Failed to clear cache directory: {}", e);
-            }
-            if let Err(e) = fs::create_dir_all(&cache_dir) {
-                error!("Failed to recreate cache directory: {}", e);
-            }
-        }
     }
 
     pub fn is_item_favorite(&self, item: &FeedItem) -> bool {

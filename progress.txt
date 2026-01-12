@@ -2,6 +2,19 @@
 
 ## 2026-01-12
 
+### Fixed: High Bug #3 - Cache Cleared on Every Startup
+
+**Location:** `src/app.rs:103`
+
+**Problem:** `clear_cache_dir()` was called unconditionally in `App::new()` on every startup, which deleted all cached feed data. This defeated the purpose of caching for offline reading and forced users to wait for feeds to reload every time.
+
+**Solution:** Removed the `clear_cache_dir()` call from `App::new()`. The existing cache system already has proper 1-hour TTL expiration logic in `load_feed_cache()`, making the startup cache clear unnecessary. Also removed the now-unused `clear_cache_dir()` function to avoid dead code.
+
+**Files changed:**
+- `src/app.rs` - Removed `clear_cache_dir()` call from `App::new()` and removed the unused `clear_cache_dir()` function
+
+**Tests:** All tests pass (13 total: 8 app tests, 5 ui tests)
+
 ### Fixed: Critical Bug #2 - Integer Underflow in `truncate_text`
 
 **Location:** `src/ui.rs:346-361`
