@@ -18,6 +18,98 @@ const DEFAULT_AUTO_REFRESH_MINS: u64 = 0;
 /// Default cache duration in minutes (60 = 1 hour)
 const DEFAULT_CACHE_DURATION_MINS: u64 = 60;
 
+/// Color theme for the application UI
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct Theme {
+    /// Primary accent color (titles, headers)
+    #[serde(default = "default_primary")]
+    pub primary: String,
+    /// Secondary accent color (selected items, section headers)
+    #[serde(default = "default_secondary")]
+    pub secondary: String,
+    /// Default text color
+    #[serde(default = "default_text")]
+    pub text: String,
+    /// Muted text color (read items, inactive elements)
+    #[serde(default = "default_muted")]
+    pub muted: String,
+    /// Error message color
+    #[serde(default = "default_error")]
+    pub error: String,
+    /// Highlight color (unread counts, links)
+    #[serde(default = "default_highlight")]
+    pub highlight: String,
+    /// Description/secondary text color
+    #[serde(default = "default_description")]
+    pub description: String,
+    /// Category header color
+    #[serde(default = "default_category")]
+    pub category: String,
+}
+
+fn default_primary() -> String {
+    "green".to_string()
+}
+
+fn default_secondary() -> String {
+    "yellow".to_string()
+}
+
+fn default_text() -> String {
+    "white".to_string()
+}
+
+fn default_muted() -> String {
+    "dark_gray".to_string()
+}
+
+fn default_error() -> String {
+    "red".to_string()
+}
+
+fn default_highlight() -> String {
+    "cyan".to_string()
+}
+
+fn default_description() -> String {
+    "gray".to_string()
+}
+
+fn default_category() -> String {
+    "magenta".to_string()
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Self {
+            primary: default_primary(),
+            secondary: default_secondary(),
+            text: default_text(),
+            muted: default_muted(),
+            error: default_error(),
+            highlight: default_highlight(),
+            description: default_description(),
+            category: default_category(),
+        }
+    }
+}
+
+impl Theme {
+    /// Returns a light theme suitable for light terminal backgrounds
+    pub fn light() -> Self {
+        Self {
+            primary: "blue".to_string(),
+            secondary: "magenta".to_string(),
+            text: "black".to_string(),
+            muted: "dark_gray".to_string(),
+            error: "red".to_string(),
+            highlight: "blue".to_string(),
+            description: "dark_gray".to_string(),
+            category: "magenta".to_string(),
+        }
+    }
+}
+
 /// Application configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -30,6 +122,9 @@ pub struct Config {
     /// Cache duration in minutes (default: 60 = 1 hour)
     #[serde(default = "default_cache_duration")]
     pub cache_duration_mins: u64,
+    /// Color theme (default: dark theme)
+    #[serde(default)]
+    pub theme: Theme,
 }
 
 fn default_http_timeout() -> u64 {
@@ -50,6 +145,7 @@ impl Default for Config {
             http_timeout_secs: DEFAULT_HTTP_TIMEOUT_SECS,
             auto_refresh_mins: DEFAULT_AUTO_REFRESH_MINS,
             cache_duration_mins: DEFAULT_CACHE_DURATION_MINS,
+            theme: Theme::default(),
         }
     }
 }

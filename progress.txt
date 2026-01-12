@@ -693,3 +693,89 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)
 
+---
+
+### Implemented: Medium Priority Feature #11 - Theme Customization
+
+**Location:** `src/app.rs`, `src/ui.rs`
+
+**Description:** Added support for customizable color themes, allowing users to personalize the application's appearance or switch between light and dark themes. This improves accessibility and supports user preference.
+
+**Implementation Details:**
+
+1. **New Theme struct:** Added `Theme` struct with 8 customizable color fields:
+   ```rust
+   pub struct Theme {
+       pub primary: String,      // Titles, headers (default: "green")
+       pub secondary: String,    // Selected items, section headers (default: "yellow")
+       pub text: String,         // Default text (default: "white")
+       pub muted: String,        // Read items, inactive elements (default: "dark_gray")
+       pub error: String,        // Error messages (default: "red")
+       pub highlight: String,    // Unread counts, links (default: "cyan")
+       pub description: String,  // Secondary text (default: "gray")
+       pub category: String,     // Category headers (default: "magenta")
+   }
+   ```
+
+2. **Updated Config struct:** Added `theme` field with `#[serde(default)]` for backwards compatibility
+
+3. **New color parsing function:** Added `parse_color()` in `ui.rs` that converts color strings to ratatui `Color` values:
+   - Supports named colors: black, red, green, yellow, blue, magenta, cyan, gray, white
+   - Supports light variants: light_red, light_green, light_blue, etc.
+   - Supports dark_gray (and alternate spellings like darkgray, dark_grey)
+   - Supports hex colors with or without #: "#ff5500" or "ff5500"
+   - Case-insensitive matching
+   - Falls back to white for unknown colors
+
+4. **ThemeColors helper struct:** Created internal struct to hold resolved Color values, avoiding repeated parsing during rendering
+
+5. **Updated all rendering functions:** Modified to accept and use `ThemeColors`:
+   - `render()` - Creates ThemeColors from config theme
+   - `render_feed_content()` - Uses theme colors for items, dates, descriptions
+   - `render_feed_manager()` - Uses theme colors for feeds, categories, counts, errors
+   - `render_help_menu()` - Uses theme colors for headers and section titles
+   - `render_article_preview()` - Uses theme colors for title, metadata, content
+   - `render_command_bar()` - Uses theme colors for command text
+
+6. **Built-in light theme:** Added `Theme::light()` preset method for light terminal backgrounds:
+   ```rust
+   Theme {
+       primary: "blue",
+       secondary: "magenta",
+       text: "black",
+       muted: "dark_gray",
+       error: "red",
+       highlight: "blue",
+       description: "dark_gray",
+       category: "magenta",
+   }
+   ```
+
+7. **Backwards compatibility:** All theme fields use `#[serde(default)]` with default functions, so existing config files work without modification
+
+**Example config.json:**
+```json
+{
+  "http_timeout_secs": 30,
+  "auto_refresh_mins": 5,
+  "cache_duration_mins": 60,
+  "theme": {
+    "primary": "blue",
+    "secondary": "magenta",
+    "text": "white",
+    "muted": "dark_gray",
+    "error": "red",
+    "highlight": "cyan",
+    "description": "gray",
+    "category": "light_magenta"
+  }
+}
+```
+
+**Files changed:**
+- `src/app.rs` - Added `Theme` struct with default functions, added `theme` field to `Config`
+- `src/ui.rs` - Added `parse_color()` function, `ThemeColors` helper struct, updated all render functions to use theme colors
+- `tests/ui_tests.rs` - Added 6 new tests for `parse_color()` function
+
+**Tests:** All tests pass (35 total: 24 app tests, 11 ui tests)
+

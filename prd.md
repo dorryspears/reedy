@@ -260,9 +260,18 @@ https://news.site.com/atom.xml
 - `load_feed_cache()` now uses the configured duration instead of hardcoded 3600 seconds
 - Backwards compatible: uses `#[serde(default)]` for missing field in existing config files
 
-#### 11. Theme Customization
+#### ~~11. Theme Customization~~ DONE
 **Description:** Support light/dark themes and customizable color schemes.
 **Value:** Accessibility and user preference support.
+
+**Implementation:**
+- Added `Theme` struct with 8 customizable color fields: `primary`, `secondary`, `text`, `muted`, `error`, `highlight`, `description`, `category`
+- Theme is stored in the `Config` struct and persisted in `~/.config/reedy/config.json`
+- Colors can be specified as named colors (e.g., "green", "light_blue", "dark_gray") or hex codes (e.g., "#ff5500")
+- Added `parse_color()` function to convert color strings to ratatui `Color` values
+- Includes a built-in `Theme::light()` preset for light terminal backgrounds
+- All UI rendering functions now use theme colors instead of hardcoded values
+- Backwards compatible: uses `#[serde(default)]` for all theme fields
 
 ---
 

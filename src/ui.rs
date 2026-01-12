@@ -7,11 +7,86 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::{App, InputMode, PageMode};
+use crate::app::{App, InputMode, PageMode, Theme};
 use chrono::{DateTime, Local};
+
+/// Converts a color name string to a ratatui Color
+pub fn parse_color(color_name: &str) -> Color {
+    match color_name.to_lowercase().as_str() {
+        "black" => Color::Black,
+        "red" => Color::Red,
+        "green" => Color::Green,
+        "yellow" => Color::Yellow,
+        "blue" => Color::Blue,
+        "magenta" => Color::Magenta,
+        "cyan" => Color::Cyan,
+        "gray" | "grey" => Color::Gray,
+        "dark_gray" | "dark_grey" | "darkgray" | "darkgrey" => Color::DarkGray,
+        "light_red" | "lightred" => Color::LightRed,
+        "light_green" | "lightgreen" => Color::LightGreen,
+        "light_yellow" | "lightyellow" => Color::LightYellow,
+        "light_blue" | "lightblue" => Color::LightBlue,
+        "light_magenta" | "lightmagenta" => Color::LightMagenta,
+        "light_cyan" | "lightcyan" => Color::LightCyan,
+        "white" => Color::White,
+        // Support hex colors like "#ff5500" or "ff5500"
+        s if s.starts_with('#') && s.len() == 7 => {
+            if let (Ok(r), Ok(g), Ok(b)) = (
+                u8::from_str_radix(&s[1..3], 16),
+                u8::from_str_radix(&s[3..5], 16),
+                u8::from_str_radix(&s[5..7], 16),
+            ) {
+                Color::Rgb(r, g, b)
+            } else {
+                Color::White // fallback
+            }
+        }
+        s if s.len() == 6 => {
+            if let (Ok(r), Ok(g), Ok(b)) = (
+                u8::from_str_radix(&s[0..2], 16),
+                u8::from_str_radix(&s[2..4], 16),
+                u8::from_str_radix(&s[4..6], 16),
+            ) {
+                Color::Rgb(r, g, b)
+            } else {
+                Color::White // fallback
+            }
+        }
+        _ => Color::White, // default fallback
+    }
+}
+
+/// Helper struct to hold resolved theme colors for rendering
+struct ThemeColors {
+    primary: Color,
+    secondary: Color,
+    text: Color,
+    muted: Color,
+    error: Color,
+    highlight: Color,
+    description: Color,
+    category: Color,
+}
+
+impl ThemeColors {
+    fn from_theme(theme: &Theme) -> Self {
+        Self {
+            primary: parse_color(&theme.primary),
+            secondary: parse_color(&theme.secondary),
+            text: parse_color(&theme.text),
+            muted: parse_color(&theme.muted),
+            error: parse_color(&theme.error),
+            highlight: parse_color(&theme.highlight),
+            description: parse_color(&theme.description),
+            category: parse_color(&theme.category),
+        }
+    }
+}
 
 /// Renders the user interface widgets.
 pub fn render(app: &App, frame: &mut Frame) {
+    let colors = ThemeColors::from_theme(&app.config.theme);
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -57,11 +132,11 @@ pub fn render(app: &App, frame: &mut Frame) {
     ];
 
     let book_para = Paragraph::new(book_art)
-        .style(Style::default().fg(Color::Green))
+        .style(Style::default().fg(colors.primary))
         .alignment(Alignment::Center);
 
     let title_para = Paragraph::new(title_text.clone())
-        .style(Style::default().fg(Color::Green))
+        .style(Style::default().fg(colors.primary))
         .alignment(Alignment::Center);
 
     // Render the title block with border
@@ -72,7 +147,7 @@ pub fn render(app: &App, frame: &mut Frame) {
     frame.render_widget(book_para, title_layout[1]);
     frame.render_widget(
         Paragraph::new(title_text.clone())
-            .style(Style::default().fg(Color::Green))
+            .style(Style::default().fg(colors.primary))
             .alignment(Alignment::Center),
         title_layout[0],
     );
@@ -80,22 +155,22 @@ pub fn render(app: &App, frame: &mut Frame) {
 
     // If we're in help mode, render the help menu instead of the regular content
     if app.input_mode == InputMode::Help {
-        render_help_menu(app, frame, chunks[1]);
+        render_help_menu(app, frame, chunks[1], &colors);
     } else if app.input_mode == InputMode::Preview {
-        render_article_preview(app, frame, chunks[1]);
+        render_article_preview(app, frame, chunks[1], &colors);
     } else {
         match app.page_mode {
-            PageMode::FeedList => render_feed_content(app, frame, chunks[1]),
-            PageMode::FeedManager => render_feed_manager(app, frame, chunks[1]),
-            PageMode::Favorites => render_feed_content(app, frame, chunks[1]),
+            PageMode::FeedList => render_feed_content(app, frame, chunks[1], &colors),
+            PageMode::FeedManager => render_feed_manager(app, frame, chunks[1], &colors),
+            PageMode::Favorites => render_feed_content(app, frame, chunks[1], &colors),
         }
     }
 
     // Render the command bar with our new function
-    render_command_bar(app, frame, chunks[2]);
+    render_command_bar(app, frame, chunks[2], &colors);
 }
 
-fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
+fn render_feed_content(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColors) {
     // Calculate how many items can fit per page (each item takes 3 lines plus a separator)
     let items_per_page = ((area.height as usize).saturating_sub(2) / 3).max(1); // Ensure at least 1 item per page
 
@@ -116,12 +191,12 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
         .map(|(visible_idx, (_actual_idx, item))| {
             let style = if Some(visible_idx) == app.selected_index {
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(colors.secondary)
                     .add_modifier(Modifier::REVERSED)
             } else if app.is_item_read(item) {
-                Style::default().fg(Color::DarkGray)
+                Style::default().fg(colors.muted)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(colors.text)
             };
 
             let favorite_indicator = if app.is_item_favorite(item) {
@@ -157,11 +232,11 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
                 ]),
                 Line::from(vec![
                     Span::raw("   "),
-                    Span::styled(date_str, Style::default().fg(Color::Yellow)),
+                    Span::styled(date_str, Style::default().fg(colors.secondary)),
                 ]),
                 Line::from(vec![
                     Span::raw("   "),
-                    Span::styled(truncated_desc, Style::default().fg(Color::Gray)),
+                    Span::styled(truncated_desc, Style::default().fg(colors.description)),
                 ]),
             ])
         })
@@ -210,11 +285,11 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect) {
                 .title(title)
                 .borders(Borders::ALL),
         )
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(colors.text));
     frame.render_widget(list, area);
 }
 
-fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
+fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColors) {
     // Create a layout that splits the area vertically for the list and error message
     let chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -241,7 +316,7 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
             ListItem::new(Line::from(Span::styled(
                 header_text,
                 Style::default()
-                    .fg(Color::Magenta)
+                    .fg(colors.category)
                     .add_modifier(Modifier::BOLD),
             )))
         );
@@ -250,10 +325,10 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
         for feed_info in feeds {
             let style = if Some(feed_index) == app.selected_index {
                 Style::default()
-                    .fg(Color::Yellow)
+                    .fg(colors.secondary)
                     .add_modifier(Modifier::REVERSED)
             } else {
-                Style::default().fg(Color::White)
+                Style::default().fg(colors.text)
             };
 
             // Get unread count for this feed
@@ -274,9 +349,9 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
 
             // Style for unread count - highlight if there are unread items
             let count_style = if unread_count > 0 {
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                Style::default().fg(colors.highlight).add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(Color::DarkGray)
+                Style::default().fg(colors.muted)
             };
 
             items.push(
@@ -293,22 +368,22 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
 
     let list = List::new(items)
         .block(Block::default().title("RSS Feeds").borders(Borders::ALL))
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(colors.text));
     frame.render_widget(list, chunks[0]);
 
     // Render error message if present
     if let Some(error) = &app.error_message {
         let error_text = Line::from(vec![
-            Span::styled("Error: ", Style::default().fg(Color::Red)),
-            Span::styled(error, Style::default().fg(Color::Red)),
+            Span::styled("Error: ", Style::default().fg(colors.error)),
+            Span::styled(error, Style::default().fg(colors.error)),
         ]);
-        let paragraph = Paragraph::new(error_text).style(Style::default().fg(Color::Red));
+        let paragraph = Paragraph::new(error_text).style(Style::default().fg(colors.error));
         frame.render_widget(paragraph, chunks[1]);
     }
 }
 
 /// Renders the help menu with all available commands based on the current page mode
-fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
+fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColors) {
     let title = "Help - Available Commands";
 
     // Create the help text based on the current page mode
@@ -318,14 +393,14 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
                 "Feed List Commands",
                 Style::default()
                     .add_modifier(Modifier::BOLD)
-                    .fg(Color::Green),
+                    .fg(colors.primary),
             )]),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "Navigation",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
-                    .fg(Color::Yellow),
+                    .fg(colors.secondary),
             )]),
             Line::from("↑/k, ↓/j      - Navigate between feed items"),
             Line::from("PgUp, PgDown   - Scroll page up/down"),
@@ -336,7 +411,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
                 "Search",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
-                    .fg(Color::Yellow),
+                    .fg(colors.secondary),
             )]),
             Line::from("/              - Start search/filter"),
             Line::from("Esc            - Clear search filter (when active)"),
@@ -345,7 +420,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
                 "Actions",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
-                    .fg(Color::Yellow),
+                    .fg(colors.secondary),
             )]),
             Line::from("p              - Open article preview pane"),
             Line::from("o              - Open selected item in browser"),
@@ -363,14 +438,14 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
                 "Feed Manager Commands",
                 Style::default()
                     .add_modifier(Modifier::BOLD)
-                    .fg(Color::Green),
+                    .fg(colors.primary),
             )]),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "Navigation",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
-                    .fg(Color::Yellow),
+                    .fg(colors.secondary),
             )]),
             Line::from("↑/k, ↓/j      - Navigate between feeds"),
             Line::from("g              - Scroll to top of feed list"),
@@ -380,7 +455,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
                 "Actions",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
-                    .fg(Color::Yellow),
+                    .fg(colors.secondary),
             )]),
             Line::from("a              - Add new feed"),
             Line::from("d              - Delete selected feed"),
@@ -397,14 +472,14 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
                 "Favorites View Commands",
                 Style::default()
                     .add_modifier(Modifier::BOLD)
-                    .fg(Color::Green),
+                    .fg(colors.primary),
             )]),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "Navigation",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
-                    .fg(Color::Yellow),
+                    .fg(colors.secondary),
             )]),
             Line::from("↑/k, ↓/j      - Navigate between favorite items"),
             Line::from("PgUp, PgDown   - Scroll page up/down"),
@@ -414,7 +489,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
                 "Search",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
-                    .fg(Color::Yellow),
+                    .fg(colors.secondary),
             )]),
             Line::from("/              - Start search/filter"),
             Line::from("Esc            - Clear search filter (when active)"),
@@ -423,7 +498,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
                 "Actions",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
-                    .fg(Color::Yellow),
+                    .fg(colors.secondary),
             )]),
             Line::from("p              - Open article preview pane"),
             Line::from("o              - Open selected item in browser"),
@@ -436,18 +511,18 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
 
     let help_paragraph = Paragraph::new(help_text)
         .block(Block::default().title(title).borders(Borders::ALL))
-        .style(Style::default().fg(Color::White));
+        .style(Style::default().fg(colors.text));
 
     frame.render_widget(help_paragraph, area);
 }
 
 /// Renders the article preview pane showing full article content
-fn render_article_preview(app: &App, frame: &mut Frame, area: Rect) {
+fn render_article_preview(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColors) {
     let Some(item) = app.get_preview_item() else {
         // Should not happen, but render empty if no item
         let paragraph = Paragraph::new("No article selected")
             .block(Block::default().title("Article Preview").borders(Borders::ALL))
-            .style(Style::default().fg(Color::Gray));
+            .style(Style::default().fg(colors.description));
         frame.render_widget(paragraph, area);
         return;
     };
@@ -476,27 +551,27 @@ fn render_article_preview(app: &App, frame: &mut Frame, area: Rect) {
         article_title,
         Style::default()
             .add_modifier(Modifier::BOLD)
-            .fg(Color::Green),
+            .fg(colors.primary),
     )]));
     lines.push(Line::from(""));
 
     // Metadata section
     if !feed_name.is_empty() {
         lines.push(Line::from(vec![
-            Span::styled("Feed: ", Style::default().fg(Color::Yellow)),
-            Span::styled(feed_name, Style::default().fg(Color::White)),
+            Span::styled("Feed: ", Style::default().fg(colors.secondary)),
+            Span::styled(feed_name, Style::default().fg(colors.text)),
         ]));
     }
 
     lines.push(Line::from(vec![
-        Span::styled("Date: ", Style::default().fg(Color::Yellow)),
-        Span::styled(date_str, Style::default().fg(Color::White)),
+        Span::styled("Date: ", Style::default().fg(colors.secondary)),
+        Span::styled(date_str, Style::default().fg(colors.text)),
     ]));
 
     if !item.link.is_empty() {
         lines.push(Line::from(vec![
-            Span::styled("Link: ", Style::default().fg(Color::Yellow)),
-            Span::styled(&item.link, Style::default().fg(Color::Cyan)),
+            Span::styled("Link: ", Style::default().fg(colors.secondary)),
+            Span::styled(&item.link, Style::default().fg(colors.highlight)),
         ]));
     }
 
@@ -508,14 +583,14 @@ fn render_article_preview(app: &App, frame: &mut Frame, area: Rect) {
     );
     lines.push(Line::from(vec![Span::styled(
         status,
-        Style::default().fg(Color::Gray),
+        Style::default().fg(colors.description),
     )]));
 
     // Separator
     lines.push(Line::from(""));
     lines.push(Line::from(vec![Span::styled(
         "─".repeat(area.width.saturating_sub(4) as usize),
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(colors.muted),
     )]));
     lines.push(Line::from(""));
 
@@ -550,7 +625,7 @@ fn render_article_preview(app: &App, frame: &mut Frame, area: Rect) {
 
     let paragraph = Paragraph::new(lines)
         .block(Block::default().title(title).borders(Borders::ALL))
-        .style(Style::default().fg(Color::White))
+        .style(Style::default().fg(colors.text))
         .scroll((scroll as u16, 0));
 
     frame.render_widget(paragraph, area);
@@ -632,7 +707,7 @@ pub fn truncate_text(text: &str, max_width: u16) -> String {
     }
 }
 
-fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
+fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColors) {
     let commands = if app.input_mode == InputMode::Help {
         "[q/Esc/?] Exit Help".to_string()
     } else if app.input_mode == InputMode::Preview {
@@ -684,7 +759,7 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
     let truncated_commands = truncate_text(&commands, area.width.saturating_sub(2));
 
     let command_bar = Paragraph::new(truncated_commands)
-        .style(Style::default().fg(Color::Yellow))
+        .style(Style::default().fg(colors.secondary))
         .block(Block::default().borders(Borders::ALL))
         .alignment(Alignment::Left);
 
