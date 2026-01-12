@@ -56,3 +56,61 @@ fn test_app_item_favorite() {
     app.favorites.insert(item.id.clone());
     assert!(app.is_item_favorite(&item));
 }
+
+#[test]
+fn test_select_next_empty_list() {
+    let mut app = App::default();
+    // Set selected_index to Some but with empty lists
+    app.selected_index = Some(0);
+    app.page_mode = PageMode::FeedList;
+    // current_feed_content is empty by default
+    assert_eq!(app.current_feed_content.len(), 0);
+
+    // This should not panic - it should just return early
+    app.select_next();
+
+    // selected_index should remain unchanged
+    assert_eq!(app.selected_index, Some(0));
+}
+
+#[test]
+fn test_select_previous_empty_list() {
+    let mut app = App::default();
+    // Set selected_index to Some but with empty lists
+    app.selected_index = Some(0);
+    app.page_mode = PageMode::FeedList;
+    // current_feed_content is empty by default
+    assert_eq!(app.current_feed_content.len(), 0);
+
+    // This should not panic - it should just return early
+    app.select_previous();
+
+    // selected_index should remain unchanged
+    assert_eq!(app.selected_index, Some(0));
+}
+
+#[test]
+fn test_select_next_empty_feed_manager() {
+    let mut app = App::default();
+    app.selected_index = Some(0);
+    app.page_mode = PageMode::FeedManager;
+    // rss_feeds is empty by default
+    assert_eq!(app.rss_feeds.len(), 0);
+
+    // This should not panic
+    app.select_next();
+    assert_eq!(app.selected_index, Some(0));
+}
+
+#[test]
+fn test_select_previous_empty_feed_manager() {
+    let mut app = App::default();
+    app.selected_index = Some(0);
+    app.page_mode = PageMode::FeedManager;
+    // rss_feeds is empty by default
+    assert_eq!(app.rss_feeds.len(), 0);
+
+    // This should not panic
+    app.select_previous();
+    assert_eq!(app.selected_index, Some(0));
+}

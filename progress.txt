@@ -15,3 +15,23 @@
 - `tests/ui_tests.rs` - Added test `test_truncate_text_very_small_width` covering edge cases for width 0, 1, 2, and 3
 
 **Tests:** All tests pass (8 total: 4 app tests, 5 ui tests including new edge case test)
+
+### Fixed: Critical Bug #1 - Panic on Empty List Navigation
+
+**Location:** `src/app.rs:285`, `src/app.rs:296`
+
+**Problem:** `select_previous()` and `select_next()` could panic when navigating an empty list:
+- `(current + 1) % len` causes division by zero when `len == 0`
+- `len - 1` causes integer underflow when `len == 0`
+
+**Solution:** Added early return guard `if len == 0 { return; }` in both `select_previous()` and `select_next()` functions before any arithmetic operations on `len`.
+
+**Files changed:**
+- `src/app.rs` - Added empty list guard in `select_previous()` and `select_next()`
+- `tests/app_tests.rs` - Added 4 new tests covering empty list navigation edge cases:
+  - `test_select_next_empty_list`
+  - `test_select_previous_empty_list`
+  - `test_select_next_empty_feed_manager`
+  - `test_select_previous_empty_feed_manager`
+
+**Tests:** All tests pass (13 total: 8 app tests, 5 ui tests)

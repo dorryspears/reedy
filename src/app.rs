@@ -282,6 +282,9 @@ impl App {
                 PageMode::FeedList | PageMode::Favorites => self.current_feed_content.len(),
                 PageMode::FeedManager => self.rss_feeds.len(),
             };
+            if len == 0 {
+                return;
+            }
             self.selected_index = Some(if current > 0 { current - 1 } else { len - 1 });
             self.ensure_selection_visible();
         }
@@ -293,6 +296,9 @@ impl App {
                 PageMode::FeedList | PageMode::Favorites => self.current_feed_content.len(),
                 PageMode::FeedManager => self.rss_feeds.len(),
             };
+            if len == 0 {
+                return;
+            }
             self.selected_index = Some((current + 1) % len);
             self.ensure_selection_visible();
         }

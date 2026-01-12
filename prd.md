@@ -14,7 +14,7 @@ Reedy is a terminal-based RSS/Atom feed reader built with Rust. It provides a ke
 
 ### Critical
 
-#### 1. Panic on Empty List Navigation
+#### ~~1. Panic on Empty List Navigation~~ FIXED
 **Location:** `src/app.rs:285`, `src/app.rs:296`
 **Description:** `select_previous()` and `select_next()` can panic when the list is empty.
 - When `len` is 0, `(current + 1) % len` causes division by zero panic
@@ -22,11 +22,7 @@ Reedy is a terminal-based RSS/Atom feed reader built with Rust. It provides a ke
 
 **Impact:** Application crash when navigating with no feeds/items loaded.
 
-```rust
-// Current problematic code:
-self.selected_index = Some((current + 1) % len);  // Panics if len == 0
-self.selected_index = Some(if current > 0 { current - 1 } else { len - 1 });  // Underflow if len == 0
-```
+**Fix:** Added early return guard checking `if len == 0 { return; }` in both `select_previous()` and `select_next()` functions.
 
 #### 2. ~~Integer Underflow in `truncate_text`~~ FIXED
 **Location:** `src/ui.rs:346-361`
