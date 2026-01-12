@@ -250,9 +250,15 @@ https://news.site.com/atom.xml
 - Content is word-wrapped to fit terminal width
 - Scroll position indicator shows current line and total lines when content overflows
 
-#### 10. Configurable Cache Duration
-**Description:** Let users configure how long feed cache remains valid (currently hardcoded to 1 hour).
+#### ~~10. Configurable Cache Duration~~ DONE
+**Description:** Let users configure how long feed cache remains valid (previously hardcoded to 1 hour).
 **Value:** Flexibility for different use cases (low bandwidth vs. always fresh).
+
+**Implementation:**
+- Added `cache_duration_mins` field to `Config` struct (default: 60 minutes)
+- Configuration stored in `~/.config/reedy/config.json`
+- `load_feed_cache()` now uses the configured duration instead of hardcoded 3600 seconds
+- Backwards compatible: uses `#[serde(default)]` for missing field in existing config files
 
 #### 11. Theme Customization
 **Description:** Support light/dark themes and customizable color schemes.

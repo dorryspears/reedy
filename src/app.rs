@@ -15,6 +15,9 @@ const DEFAULT_HTTP_TIMEOUT_SECS: u64 = 30;
 /// Default auto-refresh interval in minutes (0 = disabled)
 const DEFAULT_AUTO_REFRESH_MINS: u64 = 0;
 
+/// Default cache duration in minutes (60 = 1 hour)
+const DEFAULT_CACHE_DURATION_MINS: u64 = 60;
+
 /// Application configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -24,6 +27,9 @@ pub struct Config {
     /// Auto-refresh interval in minutes (default: 0 = disabled)
     #[serde(default = "default_auto_refresh")]
     pub auto_refresh_mins: u64,
+    /// Cache duration in minutes (default: 60 = 1 hour)
+    #[serde(default = "default_cache_duration")]
+    pub cache_duration_mins: u64,
 }
 
 fn default_http_timeout() -> u64 {
@@ -34,11 +40,16 @@ fn default_auto_refresh() -> u64 {
     DEFAULT_AUTO_REFRESH_MINS
 }
 
+fn default_cache_duration() -> u64 {
+    DEFAULT_CACHE_DURATION_MINS
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             http_timeout_secs: DEFAULT_HTTP_TIMEOUT_SECS,
             auto_refresh_mins: DEFAULT_AUTO_REFRESH_MINS,
+            cache_duration_mins: DEFAULT_CACHE_DURATION_MINS,
         }
     }
 }
@@ -1355,9 +1366,10 @@ impl App {
         let cache_path = Self::get_cache_path(url);
         if let Ok(content) = fs::read_to_string(cache_path) {
             if let Ok(cache) = serde_json::from_str::<CachedFeed>(&content) {
-                // Check if cache is less than 1 hour old
+                // Check if cache is within the configured duration
+                let cache_duration_secs = self.config.cache_duration_mins * 60;
                 if let Ok(duration) = cache.last_updated.elapsed() {
-                    if duration.as_secs() < 3600 {
+                    if duration.as_secs() < cache_duration_secs {
                         return Some(cache.content);
                     }
                 }

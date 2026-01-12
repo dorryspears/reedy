@@ -650,3 +650,46 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)
 
+---
+
+### Implemented: Medium Priority Feature #10 - Configurable Cache Duration
+
+**Location:** `src/app.rs`
+
+**Description:** Added the ability to configure how long feed cache remains valid. Previously, the cache TTL was hardcoded to 1 hour (3600 seconds). Now users can customize this value to suit their needs (e.g., longer duration for low-bandwidth situations or shorter duration for always-fresh content).
+
+**Implementation Details:**
+
+1. **New constant:** Added `DEFAULT_CACHE_DURATION_MINS` constant set to 60 (1 hour)
+
+2. **Updated Config struct:** Added `cache_duration_mins` field with `#[serde(default)]` for backwards compatibility:
+   ```rust
+   pub struct Config {
+       pub http_timeout_secs: u64,
+       pub auto_refresh_mins: u64,
+       pub cache_duration_mins: u64, // new field, default: 60
+   }
+   ```
+
+3. **Updated `load_feed_cache()`:** Changed the hardcoded 3600 seconds check to use the configured value:
+   - Calculates `cache_duration_secs = self.config.cache_duration_mins * 60`
+   - Compares cache age against this configurable value
+
+4. **Backwards compatibility:**
+   - Existing config files without `cache_duration_mins` will use the default (60 minutes)
+   - The `#[serde(default = "default_cache_duration")]` attribute handles missing fields
+
+**Example config.json:**
+```json
+{
+  "http_timeout_secs": 30,
+  "auto_refresh_mins": 5,
+  "cache_duration_mins": 120
+}
+```
+
+**Files changed:**
+- `src/app.rs` - Added `DEFAULT_CACHE_DURATION_MINS` constant, `cache_duration_mins` field to Config, `default_cache_duration()` function, and updated `load_feed_cache()` to use configurable duration
+
+**Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)
+
