@@ -110,9 +110,11 @@ pub mod ui;
 
 ### Low
 
-#### 10. Debug Statement Left in Code
+#### ~~10. Debug Statement Left in Code~~ FIXED
 **Location:** `src/app.rs:413`
 **Description:** `debug!("test");` appears to be leftover debug code that serves no purpose.
+
+**Fix:** Removed the useless `debug!("test");` statement from `select_feed()`. The function already has a proper debug statement logging meaningful context.
 
 #### 11. Silent Error Handling
 **Location:** `src/app.rs:234-252`, various `unwrap_or_default()` calls

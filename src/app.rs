@@ -433,7 +433,6 @@ impl App {
     }
 
     pub async fn select_feed(&mut self, index: usize) -> AppResult<()> {
-        debug!("test");
         if index < self.rss_feeds.len() {
             debug!("Loading feed content from index {}", index);
             self.selected_index = Some(index);

@@ -179,3 +179,18 @@ This pattern is inefficient and can cause deadlocks in certain scenarios because
 - `src/main.rs` - Updated to await `App::new()`
 
 **Tests:** All tests pass (17 total: 12 app tests, 5 ui tests)
+
+---
+
+### Fixed: Low Bug #10 - Debug Statement Left in Code
+
+**Location:** `src/app.rs:436` (was `src/app.rs:413` before previous fixes shifted line numbers)
+
+**Problem:** A leftover debug statement `debug!("test");` existed in the `select_feed()` function that served no purpose. This was likely left behind during development and cluttered the debug output.
+
+**Solution:** Removed the useless `debug!("test");` statement. The function already has a proper debug statement on the next line that logs meaningful context: `debug!("Loading feed content from index {}", index);`
+
+**Files changed:**
+- `src/app.rs` - Removed `debug!("test");` from `select_feed()` function
+
+**Tests:** All tests pass (17 total: 12 app tests, 5 ui tests)
