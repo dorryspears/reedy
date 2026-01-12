@@ -12,22 +12,33 @@ use std::{collections::HashSet, error, fs, path::PathBuf, time::Duration, time::
 /// Default HTTP request timeout in seconds
 const DEFAULT_HTTP_TIMEOUT_SECS: u64 = 30;
 
+/// Default auto-refresh interval in minutes (0 = disabled)
+const DEFAULT_AUTO_REFRESH_MINS: u64 = 0;
+
 /// Application configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// HTTP request timeout in seconds (default: 30)
     #[serde(default = "default_http_timeout")]
     pub http_timeout_secs: u64,
+    /// Auto-refresh interval in minutes (default: 0 = disabled)
+    #[serde(default = "default_auto_refresh")]
+    pub auto_refresh_mins: u64,
 }
 
 fn default_http_timeout() -> u64 {
     DEFAULT_HTTP_TIMEOUT_SECS
 }
 
+fn default_auto_refresh() -> u64 {
+    DEFAULT_AUTO_REFRESH_MINS
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             http_timeout_secs: DEFAULT_HTTP_TIMEOUT_SECS,
+            auto_refresh_mins: DEFAULT_AUTO_REFRESH_MINS,
         }
     }
 }
@@ -115,6 +126,10 @@ pub struct App {
     pub filtered_indices: Option<Vec<usize>>,
     pub import_result: Option<String>,
     pub config: Config,
+    /// Timestamp of the last feed refresh
+    pub last_refresh: Option<SystemTime>,
+    /// Flag indicating an auto-refresh is pending (set by tick, consumed by main loop)
+    pub auto_refresh_pending: bool,
 }
 
 impl Default for App {
@@ -138,6 +153,8 @@ impl Default for App {
             filtered_indices: None,
             import_result: None,
             config: Config::default(),
+            last_refresh: None,
+            auto_refresh_pending: false,
         }
     }
 }
@@ -178,11 +195,97 @@ impl App {
             all_items.sort_by(|a, b| b.published.cmp(&a.published));
             app.current_feed_content = all_items;
         }
+
+        // Record the initial refresh time
+        app.last_refresh = Some(SystemTime::now());
+
         app
     }
 
     /// Handles the tick event of the terminal.
-    pub fn tick(&self) {}
+    /// Checks if auto-refresh is due and sets the auto_refresh_pending flag.
+    pub fn tick(&mut self) {
+        // Skip auto-refresh check if disabled or no feeds
+        if self.config.auto_refresh_mins == 0 || self.rss_feeds.is_empty() {
+            return;
+        }
+
+        // Skip if we're not in a view that should auto-refresh (e.g., not in help or input modes)
+        if self.input_mode != InputMode::Normal {
+            return;
+        }
+
+        // Check if it's time for an auto-refresh
+        if let Some(last_refresh) = self.last_refresh {
+            if let Ok(elapsed) = last_refresh.elapsed() {
+                let refresh_interval = Duration::from_secs(self.config.auto_refresh_mins * 60);
+                if elapsed >= refresh_interval {
+                    debug!("Auto-refresh triggered after {} minutes", self.config.auto_refresh_mins);
+                    self.auto_refresh_pending = true;
+                }
+            }
+        }
+    }
+
+    /// Performs the auto-refresh if pending. Called from the main loop.
+    pub async fn perform_auto_refresh(&mut self) {
+        if !self.auto_refresh_pending {
+            return;
+        }
+
+        self.auto_refresh_pending = false;
+
+        // Only auto-refresh in FeedList or Favorites mode
+        match self.page_mode {
+            PageMode::FeedList => {
+                info!("Auto-refreshing feeds...");
+                if let Err(e) = self.refresh_all_feeds().await {
+                    error!("Auto-refresh failed: {}", e);
+                } else {
+                    self.last_refresh = Some(SystemTime::now());
+                }
+            }
+            PageMode::Favorites => {
+                // For favorites, refresh all feeds then re-filter to favorites
+                info!("Auto-refreshing feeds (favorites view)...");
+                if let Err(e) = self.refresh_all_feeds().await {
+                    error!("Auto-refresh failed: {}", e);
+                } else {
+                    // Re-filter to show only favorites
+                    let favorites: Vec<FeedItem> = self
+                        .current_feed_content
+                        .iter()
+                        .filter(|item| self.favorites.contains(&item.id))
+                        .cloned()
+                        .collect();
+                    self.current_feed_content = favorites;
+                    self.last_refresh = Some(SystemTime::now());
+                }
+            }
+            PageMode::FeedManager => {
+                // Don't auto-refresh in feed manager mode
+                self.last_refresh = Some(SystemTime::now());
+            }
+        }
+    }
+
+    /// Returns the time until the next auto-refresh, or None if auto-refresh is disabled.
+    pub fn time_until_next_refresh(&self) -> Option<Duration> {
+        if self.config.auto_refresh_mins == 0 {
+            return None;
+        }
+
+        let refresh_interval = Duration::from_secs(self.config.auto_refresh_mins * 60);
+        if let Some(last_refresh) = self.last_refresh {
+            if let Ok(elapsed) = last_refresh.elapsed() {
+                if elapsed < refresh_interval {
+                    return Some(refresh_interval - elapsed);
+                }
+            }
+        }
+
+        Some(Duration::from_secs(0))
+    }
 
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {

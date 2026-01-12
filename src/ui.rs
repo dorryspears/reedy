@@ -22,10 +22,19 @@ pub fn render(app: &App, frame: &mut Frame) {
         .split(frame.area());
 
     // Title bar with pixelated book
-    let title_text = match app.page_mode {
+    let base_title = match app.page_mode {
         PageMode::FeedList => "Reedy",
         PageMode::FeedManager => "Feed Manager",
         PageMode::Favorites => "Favorites",
+    };
+
+    // Add auto-refresh indicator if enabled
+    let title_text = if let Some(remaining) = app.time_until_next_refresh() {
+        let mins = remaining.as_secs() / 60;
+        let secs = remaining.as_secs() % 60;
+        format!("{} [Auto: {}:{:02}]", base_title, mins, secs)
+    } else {
+        base_title.to_string()
     };
 
     // Create a layout for the title area to position the book icon and title text
@@ -51,7 +60,7 @@ pub fn render(app: &App, frame: &mut Frame) {
         .style(Style::default().fg(Color::Green))
         .alignment(Alignment::Center);
 
-    let title_para = Paragraph::new(title_text)
+    let title_para = Paragraph::new(title_text.clone())
         .style(Style::default().fg(Color::Green))
         .alignment(Alignment::Center);
 
@@ -61,7 +70,12 @@ pub fn render(app: &App, frame: &mut Frame) {
 
     // Render book and title text inside the block
     frame.render_widget(book_para, title_layout[1]);
-    frame.render_widget(title_para.clone(), title_layout[0]);
+    frame.render_widget(
+        Paragraph::new(title_text.clone())
+            .style(Style::default().fg(Color::Green))
+            .alignment(Alignment::Center),
+        title_layout[0],
+    );
     frame.render_widget(title_para, title_layout[2]);
 
     // If we're in help mode, render the help menu instead of the regular content

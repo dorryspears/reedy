@@ -48,7 +48,11 @@ async fn main() -> AppResult<()> {
         tui.draw(&mut app)?;
         // Handle events.
         match tui.events.next().await? {
-            Event::Tick => app.tick(),
+            Event::Tick => {
+                app.tick();
+                // Perform auto-refresh if pending
+                app.perform_auto_refresh().await;
+            }
             Event::Key(key_event) => handle_key_events(key_event, &mut app).await?,
             Event::Mouse(_) => {}
             Event::Resize(width, height) => {

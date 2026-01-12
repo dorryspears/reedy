@@ -514,3 +514,62 @@ This pattern is inefficient and can cause deadlocks in certain scenarios because
 
 **Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)
 
+---
+
+### Implemented: Medium Priority Feature #8 - Auto-Refresh Interval
+
+**Location:** `src/app.rs`, `src/main.rs`, `src/handler.rs`, `src/ui.rs`
+
+**Description:** Added the ability to automatically refresh feeds at a configurable interval. This allows users to see new content without having to manually refresh, making the app more convenient for continuous monitoring of feeds.
+
+**Implementation Details:**
+
+1. **Updated Config struct:** Added `auto_refresh_mins` field with `#[serde(default)]` for backwards compatibility:
+   ```rust
+   pub struct Config {
+       pub http_timeout_secs: u64,
+       pub auto_refresh_mins: u64, // default: 0 (disabled)
+   }
+   ```
+
+2. **New App fields:**
+   - `last_refresh: Option<SystemTime>` - Tracks when feeds were last refreshed
+   - `auto_refresh_pending: bool` - Flag set by tick() when refresh is due
+
+3. **Updated App methods:**
+   - `tick()` - Now checks if auto-refresh interval has elapsed and sets the pending flag
+   - `perform_auto_refresh()` - New async method that executes the refresh when pending
+   - `time_until_next_refresh()` - Returns duration until next auto-refresh for UI display
+
+4. **Main loop integration:**
+   - The tick event now calls both `tick()` and `perform_auto_refresh().await`
+   - This allows the auto-refresh to execute asynchronously without blocking
+
+5. **Manual refresh integration:**
+   - When user presses `c` to refresh, `last_refresh` is updated to reset the timer
+
+6. **UI Updates:**
+   - Title bar shows auto-refresh countdown when enabled: `[Auto: M:SS]`
+   - Format shows minutes and seconds remaining until next refresh
+
+7. **Smart refresh behavior:**
+   - Only refreshes in FeedList or Favorites mode
+   - Skips refresh during input modes (Adding, Searching, Importing, etc.)
+   - In Favorites mode, re-filters content after refresh to maintain view
+
+**Example config.json:**
+```json
+{
+  "http_timeout_secs": 30,
+  "auto_refresh_mins": 5
+}
+```
+
+**Files changed:**
+- `src/app.rs` - Added `auto_refresh_mins` to Config, `last_refresh` and `auto_refresh_pending` to App, implemented tick(), perform_auto_refresh(), and time_until_next_refresh()
+- `src/main.rs` - Updated tick event handler to call perform_auto_refresh()
+- `src/handler.rs` - Updated manual refresh handler to reset last_refresh timer
+- `src/ui.rs` - Added auto-refresh countdown display to title bar
+
+**Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)
+

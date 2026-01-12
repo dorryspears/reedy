@@ -221,9 +221,19 @@ https://news.site.com/atom.xml
 - Enter empty text to remove a category from a feed
 - Category is persisted in the saved state file
 
-#### 8. Auto-Refresh Interval
+#### ~~8. Auto-Refresh Interval~~ DONE
 **Description:** Automatically refresh feeds at a configurable interval.
 **Value:** Users see new content without manual refresh.
+
+**Implementation:**
+- Added `auto_refresh_mins` field to `Config` struct (default: 0 = disabled)
+- Configuration stored in `~/.config/reedy/config.json`
+- `tick()` method checks if refresh interval has elapsed and sets `auto_refresh_pending` flag
+- `perform_auto_refresh()` async method executes the refresh when triggered
+- Auto-refresh works in FeedList and Favorites view modes
+- Title bar displays countdown timer when auto-refresh is enabled: `[Auto: M:SS]`
+- Manual refresh (via `c` key) resets the auto-refresh timer
+- Auto-refresh is skipped during input modes (adding, searching, etc.)
 
 #### 9. Article Preview Pane
 **Description:** Show full article content in a dedicated pane within the TUI.

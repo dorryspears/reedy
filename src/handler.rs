@@ -94,6 +94,8 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 if let Err(e) = app.refresh_all_feeds().await {
                     error!("Failed to refresh feeds: {}", e);
                     app.error_message = Some(format!("Failed to refresh feeds: {}", e));
+                } else {
+                    app.last_refresh = Some(std::time::SystemTime::now());
                 }
             }
             KeyCode::Char('f') => {
