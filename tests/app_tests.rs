@@ -920,3 +920,111 @@ fn test_keybindings_partial_config() {
     assert_eq!(kb.move_down, "j,Down");
     assert_eq!(kb.toggle_favorite, "f");
 }
+
+#[test]
+fn test_command_mode_start_and_cancel() {
+    let mut app = App::default();
+    assert_eq!(app.input_mode, InputMode::Normal);
+    assert!(app.command_buffer.is_empty());
+
+    // Enter command mode
+    app.start_command_mode();
+    assert_eq!(app.input_mode, InputMode::Command);
+    assert!(app.command_buffer.is_empty());
+
+    // Type a command
+    app.command_buffer.push_str("quit");
+
+    // Cancel command mode
+    app.cancel_command_mode();
+    assert_eq!(app.input_mode, InputMode::Normal);
+    assert!(app.command_buffer.is_empty());
+}
+
+#[test]
+fn test_command_quit() {
+    let mut app = App::default();
+    assert!(app.running);
+
+    app.command_buffer = "q".to_string();
+    let result = app.execute_command();
+    assert!(result.is_ok());
+    assert!(!app.running);
+}
+
+#[test]
+fn test_command_quit_long() {
+    let mut app = App::default();
+    assert!(app.running);
+
+    app.command_buffer = "quit".to_string();
+    let result = app.execute_command();
+    assert!(result.is_ok());
+    assert!(!app.running);
+}
+
+#[test]
+fn test_command_wq() {
+    let mut app = App::default();
+    assert!(app.running);
+
+    app.command_buffer = "wq".to_string();
+    let result = app.execute_command();
+    assert!(result.is_ok());
+    assert!(!app.running);
+}
+
+#[test]
+fn test_command_help() {
+    let mut app = App::default();
+    assert_eq!(app.input_mode, InputMode::Normal);
+
+    app.command_buffer = "help".to_string();
+    let result = app.execute_command();
+    assert!(result.is_ok());
+    assert_eq!(app.input_mode, InputMode::Help);
+}
+
+#[test]
+fn test_command_feeds() {
+    let mut app = App::default();
+    assert_eq!(app.page_mode, PageMode::FeedList);
+
+    app.command_buffer = "feeds".to_string();
+    let result = app.execute_command();
+    assert!(result.is_ok());
+    assert_eq!(app.page_mode, PageMode::FeedManager);
+}
+
+#[test]
+fn test_command_unknown() {
+    let mut app = App::default();
+
+    app.command_buffer = "unknown_command".to_string();
+    let result = app.execute_command();
+    assert!(result.is_ok()); // Returns Ok(false) for unknown commands
+    assert!(app.error_message.is_some());
+    assert!(app.error_message.unwrap().contains("Unknown command"));
+}
+
+#[test]
+fn test_command_empty() {
+    let mut app = App::default();
+    assert!(app.running);
+
+    app.command_buffer = "".to_string();
+    let result = app.execute_command();
+    assert!(result.is_ok());
+    assert!(app.running); // Should not quit on empty command
+}
+
+#[test]
+fn test_command_scroll_to_top() {
+    let mut app = App::default();
+    app.scroll = 10;
+
+    app.command_buffer = "0".to_string();
+    let result = app.execute_command();
+    assert!(result.is_ok());
+    assert_eq!(app.scroll, 0);
+}

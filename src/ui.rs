@@ -507,6 +507,21 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                 "{:<14} - Quit application",
                 format_keybinding(&kb.quit)
             )),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "Vi-Style Commands",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(colors.secondary),
+            )]),
+            Line::from(":              - Enter command mode"),
+            Line::from(":q             - Quit application"),
+            Line::from(":w             - Save state"),
+            Line::from(":wq            - Save and quit"),
+            Line::from(":help          - Show help"),
+            Line::from(":feeds         - Open feed manager"),
+            Line::from(":fav           - Toggle favorites view"),
+            Line::from(":read          - Mark all as read"),
         ],
         PageMode::FeedManager => vec![
             Line::from(vec![Span::styled(
@@ -589,6 +604,18 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                 "{:<14} - Quit application",
                 format_keybinding(&kb.quit) + "/Esc"
             )),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "Vi-Style Commands",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(colors.secondary),
+            )]),
+            Line::from(":              - Enter command mode"),
+            Line::from(":q             - Quit application"),
+            Line::from(":w             - Save state"),
+            Line::from(":wq            - Save and quit"),
+            Line::from(":help          - Show help"),
         ],
         PageMode::Favorites => vec![
             Line::from(vec![Span::styled(
@@ -663,6 +690,19 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                 "{:<14} - Quit application",
                 format_keybinding(&kb.quit)
             )),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "Vi-Style Commands",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(colors.secondary),
+            )]),
+            Line::from(":              - Enter command mode"),
+            Line::from(":q             - Quit application"),
+            Line::from(":w             - Save state"),
+            Line::from(":wq            - Save and quit"),
+            Line::from(":help          - Show help"),
+            Line::from(":fav           - Return to all feeds view"),
         ],
     };
 
@@ -871,6 +911,8 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
         "[↑↓/jk] Scroll  [PgUp/PgDn] Page  [o] Open in Browser  [r] Toggle Read  [f] Toggle Favorite  [Esc/q/p] Close".to_string()
     } else if app.input_mode == InputMode::Searching {
         format!("Search: {}█  [Enter] Confirm  [Esc] Cancel", app.search_query)
+    } else if app.input_mode == InputMode::Command {
+        format!(":{}█  [Enter] Execute  [Esc] Cancel", app.command_buffer)
     } else {
         match app.page_mode {
             PageMode::FeedList => {
@@ -907,7 +949,7 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
                     format!("Set category: {}█  [Enter] Save  [Esc] Cancel  (empty to remove)", app.input_buffer)
                 }
                 InputMode::FeedManager => "[m] Back to Feeds  [?] Help".to_string(),
-                InputMode::Help | InputMode::Searching | InputMode::Preview => unreachable!(), // These cases are already handled above
+                InputMode::Help | InputMode::Searching | InputMode::Preview | InputMode::Command => unreachable!(), // These cases are already handled above
             },
         }
     };

@@ -993,3 +993,67 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (49 total: 38 app tests, 11 ui tests)
 
+---
+
+### Implemented: Low Priority Feature #13 - Vi-Style Commands
+
+**Location:** `src/app.rs`, `src/handler.rs`, `src/ui.rs`
+
+**Description:** Added support for vi-style command mode with `:q`, `:w`, `:wq` style commands. This provides a familiar interface for vim users and offers a consistent terminal experience.
+
+**Implementation Details:**
+
+1. **New InputMode:** Added `InputMode::Command` to handle command input state
+
+2. **New App field:** Added `command_buffer: String` to store the typed command
+
+3. **New App methods:**
+   - `start_command_mode()` - enters command mode (triggered by `:`)
+   - `cancel_command_mode()` - cancels command mode without executing
+   - `execute_command()` - parses and executes the command buffer
+
+4. **Supported Commands:**
+   | Command | Aliases | Action |
+   |---------|---------|--------|
+   | `:q` | `:quit` | Quit the application |
+   | `:w` | `:write`, `:save` | Save application state |
+   | `:wq` | `:x` | Save and quit |
+   | `:q!` | - | Force quit without explicit save |
+   | `:help` | `:h` | Toggle help menu |
+   | `:feeds` | `:manage` | Open feed manager |
+   | `:favorites` | `:fav` | Toggle favorites view |
+   | `:read` | `:markread` | Mark all items as read |
+   | `:refresh` | `:r` | Trigger feed refresh |
+   | `:0` | `:top`, `:gg` | Scroll to top |
+   | `:$` | `:bottom` | Scroll to bottom |
+
+5. **Key bindings:**
+   - `:` in FeedList, FeedManager, or Favorites view enters command mode
+   - `Enter` executes the command
+   - `Esc` cancels command mode
+
+6. **UI Updates:**
+   - Command bar shows `:command█` during command mode
+   - Help menus updated with Vi-Style Commands section documenting all available commands
+
+7. **Handler integration:**
+   - Command mode handled before other input modes in handler
+   - Special handling for async commands (`:favorites` uses a marker to trigger async action)
+
+**Files changed:**
+- `src/app.rs` - Added `InputMode::Command`, `command_buffer` field, and command execution methods
+- `src/handler.rs` - Added `:` key binding to enter command mode, command mode key handling
+- `src/ui.rs` - Updated command bar to show command input, added Vi-Style Commands section to help menus
+- `tests/app_tests.rs` - Added 9 new tests:
+  - `test_command_mode_start_and_cancel` - verifies entering and canceling command mode
+  - `test_command_quit` - tests `:q` command
+  - `test_command_quit_long` - tests `:quit` command
+  - `test_command_wq` - tests `:wq` command
+  - `test_command_help` - tests `:help` command
+  - `test_command_feeds` - tests `:feeds` command
+  - `test_command_unknown` - tests unknown command error handling
+  - `test_command_empty` - tests empty command handling
+  - `test_command_scroll_to_top` - tests `:0` command
+
+**Tests:** All tests pass (58 total: 47 app tests, 11 ui tests)
+

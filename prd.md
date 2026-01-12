@@ -300,9 +300,27 @@ https://news.site.com/atom.xml
 - Help menu dynamically displays configured keybindings
 - Full backwards compatibility: missing keybinding fields use vim-style defaults
 
-#### 13. Vi-Style Commands
+#### ~~13. Vi-Style Commands~~ DONE
 **Description:** Support command mode with `:q`, `:w`, `:wq` style commands.
 **Value:** Familiar to vim users; consistent terminal experience.
+
+**Implementation:**
+- Press `:` in FeedList, FeedManager, or Favorites view to enter command mode
+- Type a command and press `Enter` to execute, or `Esc` to cancel
+- Supported commands:
+  - `:q` or `:quit` - Quit the application
+  - `:w` or `:write` or `:save` - Save application state
+  - `:wq` or `:x` - Save and quit
+  - `:q!` - Force quit without explicit save
+  - `:help` or `:h` - Toggle help menu
+  - `:feeds` or `:manage` - Open feed manager
+  - `:favorites` or `:fav` - Toggle favorites view
+  - `:read` or `:markread` - Mark all items as read
+  - `:refresh` or `:r` - Refresh feeds
+  - `:0` or `:top` or `:gg` - Scroll to top
+  - `:$` or `:bottom` - Scroll to bottom
+- Command mode displays `:command█` in command bar
+- Help menus updated with vi-style command documentation
 
 #### 14. Mouse Support
 **Description:** Enable clicking to select items and scroll.

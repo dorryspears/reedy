@@ -356,6 +356,7 @@ pub enum InputMode {
     Importing,
     SettingCategory,
     Preview,
+    Command,
 }
 
 #[derive(Debug, PartialEq)]
@@ -425,6 +426,8 @@ pub struct App {
     pub auto_refresh_pending: bool,
     /// Scroll position for the article preview pane
     pub preview_scroll: u16,
+    /// Buffer for vi-style command mode (e.g., :q, :w, :wq)
+    pub command_buffer: String,
 }
 
 impl Default for App {
@@ -451,6 +454,7 @@ impl Default for App {
             last_refresh: None,
             auto_refresh_pending: false,
             preview_scroll: 0,
+            command_buffer: String::new(),
         }
     }
 }
@@ -1764,6 +1768,98 @@ impl App {
             }
         }
         None
+    }
+
+    /// Enters vi-style command mode (triggered by ':')
+    pub fn start_command_mode(&mut self) {
+        self.input_mode = InputMode::Command;
+        self.command_buffer.clear();
+    }
+
+    /// Cancels command mode without executing
+    pub fn cancel_command_mode(&mut self) {
+        self.input_mode = InputMode::Normal;
+        self.command_buffer.clear();
+    }
+
+    /// Executes the current command buffer and returns to normal mode.
+    /// Returns Ok(true) if the command was executed successfully,
+    /// Ok(false) if the command was not recognized,
+    /// or an error if execution failed.
+    pub fn execute_command(&mut self) -> AppResult<bool> {
+        let command = self.command_buffer.trim().to_lowercase();
+        self.input_mode = InputMode::Normal;
+        self.command_buffer.clear();
+
+        match command.as_str() {
+            // Quit commands
+            "q" | "quit" => {
+                self.quit();
+                Ok(true)
+            }
+            // Write/save commands
+            "w" | "write" | "save" => {
+                self.save_state()?;
+                self.error_message = Some("State saved".to_string());
+                Ok(true)
+            }
+            // Write and quit
+            "wq" | "x" => {
+                self.save_state()?;
+                self.quit();
+                Ok(true)
+            }
+            // Force quit (without save - but we always save state anyway)
+            "q!" => {
+                self.quit();
+                Ok(true)
+            }
+            // Refresh feeds
+            "refresh" | "r" => {
+                // Set a flag to indicate refresh is needed (actual refresh is async)
+                self.auto_refresh_pending = true;
+                Ok(true)
+            }
+            // Help
+            "help" | "h" => {
+                self.toggle_help();
+                Ok(true)
+            }
+            // Open feed manager
+            "feeds" | "manage" => {
+                self.toggle_feed_manager();
+                Ok(true)
+            }
+            // Toggle favorites view
+            "favorites" | "fav" => {
+                // Return false to indicate async action needed
+                // The handler will call toggle_favorites_page().await
+                self.error_message = Some("__toggle_favorites__".to_string());
+                Ok(true)
+            }
+            // Mark all as read
+            "read" | "markread" => {
+                self.mark_all_as_read();
+                Ok(true)
+            }
+            // Scroll to top
+            "0" | "top" | "gg" => {
+                self.scroll_to_top();
+                Ok(true)
+            }
+            // Scroll to bottom
+            "$" | "bottom" => {
+                self.scroll_to_bottom();
+                Ok(true)
+            }
+            // Empty command - just cancel
+            "" => Ok(true),
+            // Unknown command
+            _ => {
+                self.error_message = Some(format!("Unknown command: {}", command));
+                Ok(false)
+            }
+        }
     }
 
     /// Starts search mode

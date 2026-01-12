@@ -86,6 +86,32 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
         return Ok(());
     }
 
+    // Handle vi-style command mode
+    if app.input_mode == InputMode::Command {
+        match key_event.code {
+            KeyCode::Enter => {
+                if app.execute_command().is_ok() {
+                    // Check if we need to toggle favorites (async operation)
+                    if app.error_message == Some("__toggle_favorites__".to_string()) {
+                        app.error_message = None;
+                        app.toggle_favorites_page().await;
+                    }
+                }
+            }
+            KeyCode::Esc => {
+                app.cancel_command_mode();
+            }
+            KeyCode::Char(c) => {
+                app.command_buffer.push(c);
+            }
+            KeyCode::Backspace => {
+                app.command_buffer.pop();
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     // Handle preview mode
     if app.input_mode == InputMode::Preview {
         let kb = keys(app).clone();
@@ -122,7 +148,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
 
     match app.page_mode {
         PageMode::FeedList => {
-            if key_matches(&key_event, &kb.quit) {
+            // Enter vi-style command mode with ':'
+            if key_event.code == KeyCode::Char(':') {
+                app.start_command_mode();
+            } else if key_matches(&key_event, &kb.quit) {
                 app.quit();
             } else if key_event.code == KeyCode::Esc {
                 // If there's an active search filter, clear it; otherwise quit
@@ -180,7 +209,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
         }
         PageMode::FeedManager => match app.input_mode {
             InputMode::Normal => {
-                if key_matches(&key_event, &kb.quit) || key_event.code == KeyCode::Esc {
+                // Enter vi-style command mode with ':'
+                if key_event.code == KeyCode::Char(':') {
+                    app.start_command_mode();
+                } else if key_matches(&key_event, &kb.quit) || key_event.code == KeyCode::Esc {
                     app.quit();
                 } else if key_matches(&key_event, &kb.open_feed_manager) {
                     debug!("Are we logging?");
@@ -310,7 +342,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             _ => {}
         },
         PageMode::Favorites => {
-            if key_matches(&key_event, &kb.quit) {
+            // Enter vi-style command mode with ':'
+            if key_event.code == KeyCode::Char(':') {
+                app.start_command_mode();
+            } else if key_matches(&key_event, &kb.quit) {
                 app.quit();
             } else if key_event.code == KeyCode::Esc {
                 // If there's an active search filter, clear it; otherwise quit
