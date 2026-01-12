@@ -24,6 +24,9 @@ const DEFAULT_CACHE_DURATION_MINS: u64 = 60;
 /// Default notifications enabled setting (false = disabled)
 const DEFAULT_NOTIFICATIONS_ENABLED: bool = false;
 
+/// Default mark read on scroll setting (false = disabled)
+const DEFAULT_MARK_READ_ON_SCROLL: bool = false;
+
 /// Color theme for the application UI
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Theme {
@@ -317,6 +320,9 @@ pub struct Config {
     /// Desktop notifications for new articles (default: false)
     #[serde(default = "default_notifications_enabled")]
     pub notifications_enabled: bool,
+    /// Auto-mark items as read when scrolling past them (default: false)
+    #[serde(default = "default_mark_read_on_scroll")]
+    pub mark_read_on_scroll: bool,
     /// Color theme (default: dark theme)
     #[serde(default)]
     pub theme: Theme,
@@ -341,6 +347,10 @@ fn default_notifications_enabled() -> bool {
     DEFAULT_NOTIFICATIONS_ENABLED
 }
 
+fn default_mark_read_on_scroll() -> bool {
+    DEFAULT_MARK_READ_ON_SCROLL
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -348,6 +358,7 @@ impl Default for Config {
             auto_refresh_mins: DEFAULT_AUTO_REFRESH_MINS,
             cache_duration_mins: DEFAULT_CACHE_DURATION_MINS,
             notifications_enabled: DEFAULT_NOTIFICATIONS_ENABLED,
+            mark_read_on_scroll: DEFAULT_MARK_READ_ON_SCROLL,
             theme: Theme::default(),
             keybindings: Keybindings::default(),
         }
@@ -838,6 +849,32 @@ impl App {
         }
     }
 
+    /// Marks the currently selected item as read if mark_read_on_scroll is enabled.
+    /// This is called when navigating away from an item (scrolling to the next one).
+    /// Does not save state immediately to avoid excessive disk writes during rapid scrolling;
+    /// state will be saved on quit or next explicit save action.
+    fn mark_current_as_read_on_scroll(&mut self) {
+        if !self.config.mark_read_on_scroll {
+            return;
+        }
+
+        // Only mark read in FeedList or Favorites mode
+        if self.page_mode != PageMode::FeedList && self.page_mode != PageMode::Favorites {
+            return;
+        }
+
+        if let Some(visible_index) = self.selected_index {
+            if let Some(actual_index) = self.get_actual_index(visible_index) {
+                if let Some(item) = self.current_feed_content.get(actual_index) {
+                    if !self.read_items.contains(&item.id) {
+                        self.read_items.insert(item.id.clone());
+                        debug!("Auto-marked item as read on scroll: {}", item.title);
+                    }
+                }
+            }
+        }
+    }
+
     fn save_state(&self) -> AppResult<()> {
         let saved = SavedState {
             feeds: self.rss_feeds.clone(),
@@ -988,6 +1025,8 @@ impl App {
             if len == 0 {
                 return;
             }
+            // Mark current item as read before moving to the next (if enabled)
+            self.mark_current_as_read_on_scroll();
             self.selected_index = Some((current + 1) % len);
             self.ensure_selection_visible();
         }

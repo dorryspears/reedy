@@ -1275,3 +1275,60 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (68 total: 57 app tests, 11 ui tests)
 
+---
+
+### Implemented: Low Priority Feature #18 - Mark Items Read on Scroll
+
+**Location:** `src/app.rs`
+
+**Description:** Added the option to automatically mark items as read when scrolling past them. This is a common feature in RSS readers that reduces the need for manual marking and makes feed consumption more efficient.
+
+**Implementation Details:**
+
+1. **New Config option:** Added `mark_read_on_scroll` to `Config` struct with `#[serde(default)]` for backwards compatibility:
+   ```rust
+   pub struct Config {
+       // ... existing fields ...
+       pub mark_read_on_scroll: bool, // default: false
+   }
+   ```
+
+2. **New constant:** Added `DEFAULT_MARK_READ_ON_SCROLL: bool = false` at top of `app.rs`
+
+3. **New helper method:** Added `mark_current_as_read_on_scroll()` that:
+   - Checks if `mark_read_on_scroll` is enabled in config
+   - Only operates in FeedList or Favorites page modes
+   - Marks the currently selected item as read if not already read
+   - Does NOT save state immediately to avoid excessive disk writes during rapid scrolling
+
+4. **Updated `select_next()`:** Now calls `mark_current_as_read_on_scroll()` before moving to the next item, marking the item being scrolled away from as read.
+
+5. **Behavior:**
+   - When scrolling forward (j/↓/select_next), the item being left behind is marked as read
+   - Works in both FeedList and Favorites views
+   - Disabled in FeedManager and Preview modes
+   - State is saved on quit or next explicit save action (not on every scroll)
+
+6. **Backwards compatibility:**
+   - `mark_read_on_scroll` defaults to `false`, so existing users won't see behavior changes
+   - The `#[serde(default)]` attribute ensures missing field in config uses default
+
+**Example config.json to enable mark-read-on-scroll:**
+```json
+{
+  "http_timeout_secs": 30,
+  "mark_read_on_scroll": true
+}
+```
+
+**Files changed:**
+- `src/app.rs` - Added `mark_read_on_scroll` to Config, added `mark_current_as_read_on_scroll()` helper method, updated `select_next()` to call it
+- `tests/app_tests.rs` - Added 5 new tests:
+  - `test_mark_read_on_scroll_disabled_by_default` - verifies feature off by default
+  - `test_config_mark_read_on_scroll_field` - tests config serialization/deserialization
+  - `test_select_next_marks_read_when_enabled` - verifies items are marked read when scrolling with feature enabled
+  - `test_select_next_does_not_mark_read_when_disabled` - verifies no marking when feature disabled
+  - `test_select_next_does_not_mark_read_in_feed_manager` - verifies feature doesn't work in FeedManager mode
+
+**Tests:** All tests pass (73 total: 62 app tests, 11 ui tests)
+

@@ -1153,3 +1153,139 @@ fn test_config_notifications_enabled_field() {
     let parsed_config: Config = serde_json::from_str(config_json).unwrap();
     assert!(parsed_config.notifications_enabled);
 }
+
+#[test]
+fn test_mark_read_on_scroll_disabled_by_default() {
+    let app = App::default();
+    // Mark read on scroll should be disabled by default
+    assert!(!app.config.mark_read_on_scroll);
+}
+
+#[test]
+fn test_config_mark_read_on_scroll_field() {
+    use reedy::app::Config;
+
+    let config = Config::default();
+    // Default config should have mark_read_on_scroll disabled
+    assert!(!config.mark_read_on_scroll);
+
+    // Test that the config can be serialized/deserialized with mark_read_on_scroll enabled
+    let config_json = r#"{"mark_read_on_scroll": true}"#;
+    let parsed_config: Config = serde_json::from_str(config_json).unwrap();
+    assert!(parsed_config.mark_read_on_scroll);
+}
+
+#[test]
+fn test_select_next_marks_read_when_enabled() {
+    let mut app = App::default();
+    app.config.mark_read_on_scroll = true;
+    app.page_mode = PageMode::FeedList;
+
+    // Add some feed items
+    let item1 = FeedItem {
+        title: "Item 1".to_string(),
+        description: "Description 1".to_string(),
+        link: "https://example.com/1".to_string(),
+        published: Some(SystemTime::now()),
+        id: "item-1".to_string(),
+        feed_url: String::new(),
+    };
+    let item2 = FeedItem {
+        title: "Item 2".to_string(),
+        description: "Description 2".to_string(),
+        link: "https://example.com/2".to_string(),
+        published: Some(SystemTime::now()),
+        id: "item-2".to_string(),
+        feed_url: String::new(),
+    };
+
+    app.current_feed_content = vec![item1.clone(), item2.clone()];
+    app.selected_index = Some(0);
+
+    // Item 1 should not be read initially
+    assert!(!app.is_item_read(&item1));
+
+    // Navigate to next item
+    app.select_next();
+
+    // Now item 1 should be marked as read (we scrolled past it)
+    assert!(app.is_item_read(&item1));
+    // Item 2 should still not be read
+    assert!(!app.is_item_read(&item2));
+    // Selection should be on item 2
+    assert_eq!(app.selected_index, Some(1));
+}
+
+#[test]
+fn test_select_next_does_not_mark_read_when_disabled() {
+    let mut app = App::default();
+    app.config.mark_read_on_scroll = false; // Disabled (default)
+    app.page_mode = PageMode::FeedList;
+
+    // Add some feed items
+    let item1 = FeedItem {
+        title: "Item 1".to_string(),
+        description: "Description 1".to_string(),
+        link: "https://example.com/1".to_string(),
+        published: Some(SystemTime::now()),
+        id: "item-1".to_string(),
+        feed_url: String::new(),
+    };
+    let item2 = FeedItem {
+        title: "Item 2".to_string(),
+        description: "Description 2".to_string(),
+        link: "https://example.com/2".to_string(),
+        published: Some(SystemTime::now()),
+        id: "item-2".to_string(),
+        feed_url: String::new(),
+    };
+
+    app.current_feed_content = vec![item1.clone(), item2];
+    app.selected_index = Some(0);
+
+    // Navigate to next item
+    app.select_next();
+
+    // Item 1 should NOT be marked as read (feature is disabled)
+    assert!(!app.is_item_read(&item1));
+    // Selection should be on item 2
+    assert_eq!(app.selected_index, Some(1));
+}
+
+#[test]
+fn test_select_next_does_not_mark_read_in_feed_manager() {
+    let mut app = App::default();
+    app.config.mark_read_on_scroll = true;
+    app.page_mode = PageMode::FeedManager; // Should NOT mark read in FeedManager
+
+    // Add some feeds
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/feed1".to_string(),
+        title: "Feed 1".to_string(),
+        category: None,
+    });
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/feed2".to_string(),
+        title: "Feed 2".to_string(),
+        category: None,
+    });
+
+    // Also add feed items (for read tracking test)
+    let item1 = FeedItem {
+        title: "Item 1".to_string(),
+        description: "Description 1".to_string(),
+        link: "https://example.com/1".to_string(),
+        published: Some(SystemTime::now()),
+        id: "item-1".to_string(),
+        feed_url: String::new(),
+    };
+    app.current_feed_content = vec![item1.clone()];
+
+    app.selected_index = Some(0);
+
+    // Navigate to next item in FeedManager
+    app.select_next();
+
+    // No items should be marked as read (we're in FeedManager mode)
+    assert!(!app.is_item_read(&item1));
+}

@@ -376,9 +376,16 @@ https://news.site.com/atom.xml
 - If more than 3 new articles, shows "...and X more" suffix
 - Notifications have 5-second timeout and appear with "Reedy" app name
 
-#### 18. Mark Items Read on Scroll
+#### ~~18. Mark Items Read on Scroll~~ DONE
 **Description:** Optionally auto-mark items as read when scrolling past them.
 **Value:** Reduces manual marking; common RSS reader feature.
+
+**Implementation:**
+- Added `mark_read_on_scroll` config option (default: false) to `~/.config/reedy/config.json`
+- When enabled, items are automatically marked as read when navigating away from them (using `j`/`↓` or `select_next()`)
+- Works in FeedList and Favorites views (disabled in FeedManager and Preview modes)
+- Does not save state on every scroll to avoid excessive disk writes; state is saved on quit or next explicit save action
+- Uses the existing read tracking system (`read_items` HashSet)
 
 #### ~~19. Vim-Style `G` for Bottom~~ DONE
 **Description:** Add `G` (shift+g) to scroll to the bottom of the list (complement to `g` for top).
@@ -415,3 +422,4 @@ The application uses `~/.config/reedy/config.json` for user configuration:
 - ~~Theme/colors~~ ✓ (`theme` object with 8 color fields)
 - ~~Auto-refresh interval~~ ✓ (`auto_refresh_mins`)
 - ~~Notifications~~ ✓ (`notifications_enabled` - default: false)
+- ~~Mark read on scroll~~ ✓ (`mark_read_on_scroll` - default: false)
