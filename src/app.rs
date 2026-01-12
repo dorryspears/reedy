@@ -47,6 +47,8 @@ pub struct FeedItem {
     pub link: String,
     pub published: Option<SystemTime>,
     pub id: String,
+    #[serde(default)]
+    pub feed_url: String,
 }
 
 /// Represents a feed subscription with its URL and title
@@ -196,6 +198,26 @@ impl App {
 
     pub fn is_item_read(&self, item: &FeedItem) -> bool {
         self.read_items.contains(&item.id)
+    }
+
+    /// Returns the count of unread items for a given feed URL.
+    /// Uses cached feed content to determine the count.
+    pub fn count_unread_for_feed(&self, url: &str) -> usize {
+        if let Some(items) = self.load_feed_cache(url) {
+            items.iter().filter(|item| !self.is_item_read(item)).count()
+        } else {
+            0
+        }
+    }
+
+    /// Returns the total count of items for a given feed URL.
+    /// Uses cached feed content to determine the count.
+    pub fn count_total_for_feed(&self, url: &str) -> usize {
+        if let Some(items) = self.load_feed_cache(url) {
+            items.len()
+        } else {
+            0
+        }
     }
 
     pub fn toggle_read_status(&mut self) {
@@ -682,6 +704,7 @@ impl App {
                                         item.title().unwrap_or("No title"),
                                         published,
                                     ),
+                                    feed_url: url.clone(),
                                 }
                             })
                             .collect()
@@ -716,6 +739,7 @@ impl App {
                                             .unwrap_or_default(),
                                         published,
                                         id: Self::create_item_id(&entry.title().value, published),
+                                        feed_url: url.clone(),
                                     }
                                 })
                                 .collect(),
@@ -1056,11 +1080,11 @@ impl App {
                     if let Ok(content) = response.bytes().await {
                         // Try RSS first
                         let feed_items = match Channel::read_from(&content[..]) {
-                            Ok(channel) => convert_rss_items(channel, &feed_info.title),
+                            Ok(channel) => convert_rss_items(channel, &feed_info.title, &feed_info.url),
                             Err(_) => {
                                 // Try Atom if RSS fails
                                 match AtomFeed::read_from(&content[..]) {
-                                    Ok(feed) => convert_atom_items(feed, &feed_info.title),
+                                    Ok(feed) => convert_atom_items(feed, &feed_info.title, &feed_info.url),
                                     Err(e) => {
                                         error!("Failed to parse feed as either RSS or Atom: {}", e);
                                         continue;
@@ -1107,11 +1131,11 @@ impl App {
                     let content = response.bytes().await?;
                     // Try RSS first
                     let feed_items = match Channel::read_from(&content[..]) {
-                        Ok(channel) => convert_rss_items(channel, &feed_info.title),
+                        Ok(channel) => convert_rss_items(channel, &feed_info.title, &feed_info.url),
                         Err(_) => {
                             // Try Atom if RSS fails
                             match AtomFeed::read_from(&content[..]) {
-                                Ok(feed) => convert_atom_items(feed, &feed_info.title),
+                                Ok(feed) => convert_atom_items(feed, &feed_info.title, &feed_info.url),
                                 Err(_e) => {
                                     error!("Failed to parse feed as either RSS or Atom: {}", feed_info.url);
                                     continue;
@@ -1284,7 +1308,7 @@ pub async fn fetch_feed(url: &str) -> AppResult<Vec<FeedItem>> {
     match Channel::read_from(&response[..]) {
         Ok(channel) => {
             debug!("Successfully parsed RSS feed");
-            Ok(convert_rss_items(channel, url))
+            Ok(convert_rss_items(channel, url, url))
         }
         Err(_) => {
             // Try parsing as Atom
@@ -1292,7 +1316,7 @@ pub async fn fetch_feed(url: &str) -> AppResult<Vec<FeedItem>> {
             match AtomFeed::read_from(&response[..]) {
                 Ok(feed) => {
                     debug!("Successfully parsed Atom feed");
-                    Ok(convert_atom_items(feed, url))
+                    Ok(convert_atom_items(feed, url, url))
                 }
                 Err(e) => {
                     error!("Failed to parse feed as either RSS or Atom: {}", e);
@@ -1303,7 +1327,7 @@ pub async fn fetch_feed(url: &str) -> AppResult<Vec<FeedItem>> {
     }
 }
 
-fn convert_rss_items(channel: Channel, feed_title: &str) -> Vec<FeedItem> {
+fn convert_rss_items(channel: Channel, feed_title: &str, feed_url: &str) -> Vec<FeedItem> {
     channel
         .items()
         .iter()
@@ -1324,12 +1348,13 @@ fn convert_rss_items(channel: Channel, feed_title: &str) -> Vec<FeedItem> {
                 link: item.link().unwrap_or("").to_string(),
                 published,
                 id: App::create_item_id(item.title().unwrap_or("No title"), published),
+                feed_url: feed_url.to_string(),
             }
         })
         .collect()
 }
 
-fn convert_atom_items(feed: AtomFeed, feed_title: &str) -> Vec<FeedItem> {
+fn convert_atom_items(feed: AtomFeed, feed_title: &str, feed_url: &str) -> Vec<FeedItem> {
     feed.entries()
         .iter()
         .map(|entry| {
@@ -1355,6 +1380,7 @@ fn convert_atom_items(feed: AtomFeed, feed_title: &str) -> Vec<FeedItem> {
                     .unwrap_or_default(),
                 published,
                 id: App::create_item_id(&entry.title().value, published),
+                feed_url: feed_url.to_string(),
             }
         })
         .collect()

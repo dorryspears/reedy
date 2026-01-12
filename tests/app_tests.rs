@@ -47,6 +47,7 @@ fn test_app_item_favorite() {
         link: "https://example.com".to_string(),
         published: Some(SystemTime::now()),
         id: "test-id".to_string(),
+        feed_url: String::new(),
     };
 
     // Initially not a favorite
@@ -126,6 +127,7 @@ fn test_unfavorite_removes_from_favorites_view() {
         link: "https://example.com/1".to_string(),
         published: Some(SystemTime::now()),
         id: "id-1".to_string(),
+        feed_url: String::new(),
     };
     let item2 = FeedItem {
         title: "Item 2".to_string(),
@@ -133,6 +135,7 @@ fn test_unfavorite_removes_from_favorites_view() {
         link: "https://example.com/2".to_string(),
         published: Some(SystemTime::now()),
         id: "id-2".to_string(),
+        feed_url: String::new(),
     };
 
     // Add items to current feed content and mark them as favorites
@@ -168,6 +171,7 @@ fn test_unfavorite_last_item_in_favorites_view() {
         link: "https://example.com/only".to_string(),
         published: Some(SystemTime::now()),
         id: "only-id".to_string(),
+        feed_url: String::new(),
     };
 
     // Add item to current feed content and mark as favorite
@@ -198,6 +202,7 @@ fn test_unfavorite_does_not_remove_in_feedlist_view() {
         link: "https://example.com/test".to_string(),
         published: Some(SystemTime::now()),
         id: "test-id".to_string(),
+        feed_url: String::new(),
     };
 
     // Add item to current feed content and mark as favorite
@@ -273,6 +278,7 @@ fn test_search_filter_functionality() {
             link: "https://example.com/rust".to_string(),
             published: Some(SystemTime::now()),
             id: "id-1".to_string(),
+            feed_url: String::new(),
         },
         FeedItem {
             title: "Python Tutorial".to_string(),
@@ -280,6 +286,7 @@ fn test_search_filter_functionality() {
             link: "https://example.com/python".to_string(),
             published: Some(SystemTime::now()),
             id: "id-2".to_string(),
+            feed_url: String::new(),
         },
         FeedItem {
             title: "JavaScript Guide".to_string(),
@@ -287,6 +294,7 @@ fn test_search_filter_functionality() {
             link: "https://example.com/js".to_string(),
             published: Some(SystemTime::now()),
             id: "id-3".to_string(),
+            feed_url: String::new(),
         },
     ];
 
@@ -347,6 +355,7 @@ fn test_search_with_no_matches() {
         link: "https://example.com/rust".to_string(),
         published: Some(SystemTime::now()),
         id: "id-1".to_string(),
+        feed_url: String::new(),
     });
     app.selected_index = Some(0);
 
@@ -371,6 +380,7 @@ fn test_get_actual_index_with_filter() {
             link: format!("https://example.com/{}", i),
             published: Some(SystemTime::now()),
             id: format!("id-{}", i),
+            feed_url: String::new(),
         });
     }
 

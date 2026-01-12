@@ -343,3 +343,38 @@ This pattern is inefficient and can cause deadlocks in certain scenarios because
 - `src/ui.rs` - Updated `render_feed_manager()` to display feed titles
 
 **Tests:** All tests pass (23 total: 18 app tests, 5 ui tests)
+
+---
+
+### Implemented: High Priority Feature #5 - Unread Count per Feed
+
+**Location:** `src/app.rs`, `src/ui.rs`
+
+**Description:** Added the ability to display unread item counts for each feed in the Feed Manager. This helps users quickly identify which feeds have new content without needing to open each feed individually.
+
+**Implementation Details:**
+
+1. **New FeedItem field:** Added `feed_url: String` field to `FeedItem` struct with `#[serde(default)]` for backwards compatibility with existing cache data.
+
+2. **Updated FeedItem creation:** All places that create `FeedItem` instances now set the `feed_url` field:
+   - `convert_rss_items()` function
+   - `convert_atom_items()` function
+   - Inline creation in `load_feed_content()` for both RSS and Atom feeds
+
+3. **New App methods:**
+   - `count_unread_for_feed(url: &str) -> usize` - Returns count of unread items for a feed by loading from cache
+   - `count_total_for_feed(url: &str) -> usize` - Returns total item count for a feed
+
+4. **UI Updates in Feed Manager:**
+   - Each feed now displays: "Feed Title (unread/total)" e.g., "Tech News (3/10)"
+   - Unread counts are styled with cyan color and bold when there are unread items
+   - Count appears in dark gray when all items are read
+   - No count shown if feed has no cached content yet
+   - Title width dynamically adjusted to account for count display
+
+**Files changed:**
+- `src/app.rs` - Added `feed_url` field to `FeedItem`, added count methods, updated all FeedItem creation sites
+- `src/ui.rs` - Updated `render_feed_manager()` to display unread/total counts
+- `tests/app_tests.rs` - Updated all test FeedItem creations to include `feed_url` field
+
+**Tests:** All tests pass (23 total: 18 app tests, 5 ui tests)

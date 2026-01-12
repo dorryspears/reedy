@@ -179,9 +179,16 @@ https://news.site.com/atom.xml
 - Feed items in the list view show "Item Title | Feed Title" instead of "Item Title | URL"
 - Backwards compatible: migrates old saved state files that only stored URLs (uses URL as title initially)
 
-#### 5. Unread Count per Feed
+#### ~~5. Unread Count per Feed~~ DONE
 **Description:** Show the number of unread items for each feed in the feed manager.
 **Value:** Helps users quickly identify which feeds have new content.
+
+**Implementation:**
+- Added `feed_url` field to `FeedItem` struct to track which feed each item belongs to
+- Added `count_unread_for_feed()` and `count_total_for_feed()` methods to `App`
+- Feed Manager now displays unread/total count next to each feed title: "Feed Title (3/10)"
+- Unread counts are highlighted in cyan when there are unread items
+- Uses `#[serde(default)]` for backwards compatibility with existing cached feed data
 
 #### 6. Configurable HTTP Timeout
 **Description:** Add configuration for request timeouts to prevent hangs.

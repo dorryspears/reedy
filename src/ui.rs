@@ -222,13 +222,33 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
                 Style::default().fg(Color::White)
             };
 
-            // Calculate max width for title
-            let title_max_width = chunks[0].width.saturating_sub(8) as usize; // Account for index and spacing
+            // Get unread count for this feed
+            let unread_count = app.count_unread_for_feed(&feed_info.url);
+            let total_count = app.count_total_for_feed(&feed_info.url);
+
+            // Format the count display
+            let count_display = if total_count > 0 {
+                format!(" ({}/{})", unread_count, total_count)
+            } else {
+                String::new()
+            };
+
+            // Calculate max width for title, accounting for count display
+            let count_len = count_display.len();
+            let title_max_width = chunks[0].width.saturating_sub(8 + count_len as u16) as usize; // Account for index, spacing, and count
             let truncated_title = truncate_text(&feed_info.title, title_max_width as u16);
+
+            // Style for unread count - highlight if there are unread items
+            let count_style = if unread_count > 0 {
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::DarkGray)
+            };
 
             ListItem::new(Line::from(vec![
                 Span::raw(format!("{}. ", i + 1)),
                 Span::raw(truncated_title),
+                Span::styled(count_display, count_style),
             ]))
             .style(style)
         })
