@@ -895,7 +895,19 @@ impl App {
 
     fn load_feeds(&mut self) -> AppResult<()> {
         if self.save_path.exists() {
-            let content = fs::read_to_string(&self.save_path)?;
+            let content = match fs::read_to_string(&self.save_path) {
+                Ok(c) => c,
+                Err(e) => {
+                    error!("Failed to read feeds file: {}. Clearing corrupted data.", e);
+                    if let Err(e) = fs::remove_file(&self.save_path) {
+                        error!("Failed to remove corrupted file: {}", e);
+                    }
+                    self.error_message = Some(
+                        "Feeds data was corrupted and has been cleared. Starting fresh.".to_string(),
+                    );
+                    return Ok(());
+                }
+            };
 
             // Try to parse with new format first (Vec<FeedInfo>)
             match serde_json::from_str::<SavedState>(&content) {
@@ -964,15 +976,18 @@ impl App {
                                 self.save_path.display()
                             );
                         } else {
-                            // All parsing attempts failed - report to user
+                            // All parsing attempts failed - clear the corrupted file and start fresh
                             error!(
-                                "Failed to parse feeds file: {}. File may be corrupted.",
+                                "Failed to parse feeds file: {}. Clearing corrupted data.",
                                 self.save_path.display()
                             );
-                            self.error_message = Some(format!(
-                                "Warning: Could not parse {}. Your feeds file may be corrupted.",
-                                self.save_path.display()
-                            ));
+                            if let Err(e) = fs::remove_file(&self.save_path) {
+                                error!("Failed to remove corrupted file: {}", e);
+                            }
+                            self.error_message = Some(
+                                "Feeds data was corrupted and has been cleared. Starting fresh."
+                                    .to_string(),
+                            );
                         }
                     }
                 }
