@@ -39,3 +39,4 @@ base64 = "0.22.1"
 atom_syndication = "0.12.6"
 arboard = { version = "3", default-features = false }
 quick-xml = "0.37"
+notify-rust = "4.11"

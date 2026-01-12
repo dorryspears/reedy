@@ -1132,3 +1132,24 @@ fn test_app_default_has_empty_feed_health() {
     let app = App::default();
     assert!(app.feed_health.is_empty());
 }
+
+#[test]
+fn test_notifications_disabled_by_default() {
+    let app = App::default();
+    // Notifications should be disabled by default
+    assert!(!app.config.notifications_enabled);
+}
+
+#[test]
+fn test_config_notifications_enabled_field() {
+    use reedy::app::Config;
+
+    let config = Config::default();
+    // Default config should have notifications disabled
+    assert!(!config.notifications_enabled);
+
+    // Test that the config can be serialized/deserialized with notifications enabled
+    let config_json = r#"{"notifications_enabled": true}"#;
+    let parsed_config: Config = serde_json::from_str(config_json).unwrap();
+    assert!(parsed_config.notifications_enabled);
+}

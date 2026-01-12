@@ -21,6 +21,9 @@ const DEFAULT_AUTO_REFRESH_MINS: u64 = 0;
 /// Default cache duration in minutes (60 = 1 hour)
 const DEFAULT_CACHE_DURATION_MINS: u64 = 60;
 
+/// Default notifications enabled setting (false = disabled)
+const DEFAULT_NOTIFICATIONS_ENABLED: bool = false;
+
 /// Color theme for the application UI
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Theme {
@@ -311,6 +314,9 @@ pub struct Config {
     /// Cache duration in minutes (default: 60 = 1 hour)
     #[serde(default = "default_cache_duration")]
     pub cache_duration_mins: u64,
+    /// Desktop notifications for new articles (default: false)
+    #[serde(default = "default_notifications_enabled")]
+    pub notifications_enabled: bool,
     /// Color theme (default: dark theme)
     #[serde(default)]
     pub theme: Theme,
@@ -331,12 +337,17 @@ fn default_cache_duration() -> u64 {
     DEFAULT_CACHE_DURATION_MINS
 }
 
+fn default_notifications_enabled() -> bool {
+    DEFAULT_NOTIFICATIONS_ENABLED
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             http_timeout_secs: DEFAULT_HTTP_TIMEOUT_SECS,
             auto_refresh_mins: DEFAULT_AUTO_REFRESH_MINS,
             cache_duration_mins: DEFAULT_CACHE_DURATION_MINS,
+            notifications_enabled: DEFAULT_NOTIFICATIONS_ENABLED,
             theme: Theme::default(),
             keybindings: Keybindings::default(),
         }
@@ -518,6 +529,8 @@ pub struct App {
     pub command_buffer: String,
     /// Health status for each feed (keyed by URL)
     pub feed_health: HashMap<String, FeedHealth>,
+    /// Item IDs that have already been seen (for notification tracking)
+    seen_items: HashSet<String>,
 }
 
 impl Default for App {
@@ -546,6 +559,7 @@ impl Default for App {
             preview_scroll: 0,
             command_buffer: String::new(),
             feed_health: HashMap::new(),
+            seen_items: HashSet::new(),
         }
     }
 }
@@ -571,10 +585,25 @@ impl App {
         // Cache all feeds and load all cached content
         if !app.rss_feeds.is_empty() {
             app.selected_index = Some(0);
+
+            // Load cached content first to populate seen_items (prevents notifications on startup)
+            let mut all_items = Vec::new();
+            for feed in &app.rss_feeds {
+                if let Some(cached_items) = app.load_feed_cache(&feed.url) {
+                    all_items.extend(cached_items);
+                }
+            }
+            // Populate seen_items with cached item IDs to avoid startup notifications
+            for item in &all_items {
+                app.seen_items.insert(item.id.clone());
+            }
+            app.current_feed_content = all_items;
+
+            // Now refresh feeds (notifications will only fire for truly new items)
             let _ = app.refresh_all_feeds().await;
             app.cache_all_feeds().await;
 
-            // Load and combine all cached feed content
+            // Reload and combine all cached feed content
             let mut all_items = Vec::new();
             for feed in &app.rss_feeds {
                 if let Some(cached_items) = app.load_feed_cache(&feed.url) {
@@ -2406,10 +2435,65 @@ impl App {
         // Sort all items by date, newest first
         all_items.sort_by(|a, b| b.published.cmp(&a.published));
 
+        // Check for new items and send notifications if enabled
+        if self.config.notifications_enabled {
+            let new_items: Vec<&FeedItem> = all_items
+                .iter()
+                .filter(|item| !self.seen_items.contains(&item.id))
+                .collect();
+
+            if !new_items.is_empty() {
+                self.send_new_articles_notification(&new_items);
+            }
+        }
+
+        // Update seen items with all current item IDs
+        for item in &all_items {
+            self.seen_items.insert(item.id.clone());
+        }
+
         // Update the current feed content
         self.current_feed_content = all_items;
 
         Ok(())
+    }
+
+    /// Sends a desktop notification for new articles
+    fn send_new_articles_notification(&self, new_items: &[&FeedItem]) {
+        use notify_rust::Notification;
+
+        let count = new_items.len();
+        let summary = if count == 1 {
+            "1 new article".to_string()
+        } else {
+            format!("{} new articles", count)
+        };
+
+        // Build body with up to 3 article titles
+        let body: String = new_items
+            .iter()
+            .take(3)
+            .map(|item| format!("• {}", item.title))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let body_with_more = if count > 3 {
+            format!("{}\n...and {} more", body, count - 3)
+        } else {
+            body
+        };
+
+        if let Err(e) = Notification::new()
+            .summary(&summary)
+            .body(&body_with_more)
+            .appname("Reedy")
+            .timeout(5000)
+            .show()
+        {
+            error!("Failed to send notification: {}", e);
+        } else {
+            info!("Sent notification for {} new article(s)", count);
+        }
     }
 
     pub fn mark_as_read(&mut self) {

@@ -1212,3 +1212,66 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (66 total: 55 app tests, 11 ui tests)
 
+---
+
+### Implemented: Low Priority Feature #17 - Notification Support
+
+**Location:** `src/app.rs`, `Cargo.toml`
+
+**Description:** Added desktop notification support for new articles in subscribed feeds. When enabled, users receive system notifications whenever new articles are detected during feed refresh, keeping them informed without needing to keep the app in focus.
+
+**Implementation Details:**
+
+1. **New Dependency:** Added `notify-rust` crate (v4.11) for cross-platform desktop notifications (Linux, macOS, Windows)
+
+2. **New Config field:** Added `notifications_enabled` to `Config` struct with `#[serde(default)]` for backwards compatibility:
+   ```rust
+   pub struct Config {
+       // ... existing fields ...
+       pub notifications_enabled: bool, // default: false
+   }
+   ```
+
+3. **New App field:** Added `seen_items: HashSet<String>` to track article IDs that have already been seen (notified about)
+
+4. **Notification logic in `refresh_all_feeds()`:**
+   - After fetching all feed items, compares against `seen_items` to identify new articles
+   - If `notifications_enabled` is true and there are new items, calls `send_new_articles_notification()`
+   - All fetched items are then added to `seen_items` for future comparisons
+
+5. **New method `send_new_articles_notification()`:**
+   - Takes a slice of new `FeedItem` references
+   - Creates a desktop notification with:
+     - Summary: "1 new article" or "N new articles"
+     - Body: Up to 3 article titles with bullet points
+     - If more than 3 articles: appends "...and N more"
+     - App name: "Reedy"
+     - Timeout: 5 seconds
+
+6. **Startup initialization:**
+   - On app startup, existing cached items are loaded and their IDs added to `seen_items`
+   - This prevents notifications for all existing articles on first run
+   - Only truly new articles (fetched after startup) trigger notifications
+
+7. **Backwards compatibility:**
+   - `notifications_enabled` defaults to `false`, so existing users won't see unexpected notifications
+   - The `#[serde(default)]` attribute ensures missing field in config uses default
+
+**Example config.json to enable notifications:**
+```json
+{
+  "http_timeout_secs": 30,
+  "auto_refresh_mins": 5,
+  "notifications_enabled": true
+}
+```
+
+**Files changed:**
+- `Cargo.toml` - Added `notify-rust` dependency
+- `src/app.rs` - Added `notifications_enabled` to Config, `seen_items` to App, notification detection in `refresh_all_feeds()`, new `send_new_articles_notification()` method
+- `tests/app_tests.rs` - Added 2 new tests:
+  - `test_notifications_disabled_by_default` - verifies notifications off by default
+  - `test_config_notifications_enabled_field` - tests config serialization/deserialization
+
+**Tests:** All tests pass (68 total: 57 app tests, 11 ui tests)
+

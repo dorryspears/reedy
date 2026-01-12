@@ -362,9 +362,19 @@ https://news.site.com/atom.xml
 - Status bar in Feed Manager shows detailed health info for selected feed (e.g., "OK (250ms)" or "Error: Connection timeout")
 - Consecutive failure tracking helps identify persistently problematic feeds
 
-#### 17. Notification Support
+#### ~~17. Notification Support~~ DONE
 **Description:** Desktop notifications for new articles in subscribed feeds.
 **Value:** Stay informed without keeping the app open.
+
+**Implementation:**
+- Added `notifications_enabled` config option (default: false) to `~/.config/reedy/config.json`
+- Uses `notify-rust` crate for cross-platform desktop notifications (Linux, macOS, Windows)
+- Notifications are triggered during feed refresh when new articles are detected
+- New articles are identified by tracking seen item IDs (prevents duplicate notifications)
+- On startup, existing cached items are marked as "seen" to avoid notification spam
+- Notification displays count of new articles and up to 3 article titles
+- If more than 3 new articles, shows "...and X more" suffix
+- Notifications have 5-second timeout and appear with "Reedy" app name
 
 #### 18. Mark Items Read on Scroll
 **Description:** Optionally auto-mark items as read when scrolling past them.
@@ -404,6 +414,4 @@ The application uses `~/.config/reedy/config.json` for user configuration:
 - ~~Default keybindings~~ ✓ (`keybindings` object with 25 customizable keys)
 - ~~Theme/colors~~ ✓ (`theme` object with 8 color fields)
 - ~~Auto-refresh interval~~ ✓ (`auto_refresh_mins`)
-
-**Future:**
-- Notification preferences
+- ~~Notifications~~ ✓ (`notifications_enabled` - default: false)
