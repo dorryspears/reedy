@@ -170,9 +170,19 @@ https://news.site.com/atom.xml
 - Import validates each URL as valid RSS/Atom feed
 - Skips duplicates and invalid URLs with informative message
 
-#### 3. OPML Import/Export (Optional)
+#### ~~3. OPML Import/Export~~ DONE
 **Description:** Support importing and exporting feed lists in OPML format (industry standard).
 **Value:** Compatibility with other RSS readers for migration.
+
+**Implementation:**
+- Press `E` (shift+e) in Feed Manager to export feeds to OPML file (`~/.config/reedy/feeds.opml`)
+- Press `I` (shift+i) in Feed Manager to import feeds from OPML file (`~/.config/reedy/feeds.opml`)
+- OPML export preserves feed categories as nested outline elements
+- OPML import recognizes category structure and assigns categories to imported feeds
+- Skips duplicate URLs already in the feed list
+- Uses feed titles from OPML, falls back to URL if title is empty
+- Complements existing clipboard export (`e`) and import (`i`) for simpler operations
+- Help menu updated with OPML documentation
 
 #### ~~4. Feed Title Display~~ DONE
 **Description:** Extract and display the actual feed title instead of showing the URL.

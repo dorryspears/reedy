@@ -463,7 +463,9 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
             Line::from("d              - Delete selected feed"),
             Line::from("t              - Set category/tag for selected feed"),
             Line::from("e              - Export feeds to clipboard"),
+            Line::from("E              - Export feeds to OPML file"),
             Line::from("i              - Import feeds from clipboard"),
+            Line::from("I              - Import feeds from OPML file"),
             Line::from("c              - Refresh feed cache"),
             Line::from("m              - Return to feed list"),
             Line::from("?              - Toggle this help menu"),
@@ -739,7 +741,7 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
             }
             PageMode::FeedManager => match app.input_mode {
                 InputMode::Normal => {
-                    "[↑↓] Navigate  [a] Add  [d] Delete  [t] Tag/Category  [e] Export  [i] Import  [m] Back  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [a] Add  [d] Delete  [t] Tag  [e/E] Export  [i/I] Import  [m] Back  [?] Help  [q] Quit".to_string()
                 }
                 InputMode::Adding => format!("Enter RSS URL: {}", app.input_buffer),
                 InputMode::Deleting => {

@@ -179,8 +179,26 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 KeyCode::Char('e') => {
                     app.export_feeds_to_clipboard();
                 }
+                KeyCode::Char('E') => {
+                    // Export to OPML file
+                    if let Err(e) = app.export_opml() {
+                        error!("Failed to export OPML: {}", e);
+                    }
+                }
                 KeyCode::Char('i') => {
                     app.start_importing();
+                }
+                KeyCode::Char('I') => {
+                    // Import from OPML file
+                    let opml_path = App::get_opml_path();
+                    if opml_path.exists() {
+                        if let Err(e) = app.import_opml(&opml_path).await {
+                            error!("Failed to import OPML: {}", e);
+                            app.error_message = Some(format!("Failed to import OPML: {}", e));
+                        }
+                    } else {
+                        app.error_message = Some(format!("OPML file not found: {}", opml_path.display()));
+                    }
                 }
                 KeyCode::Enter => {
                     if let Some(index) = app.selected_index {

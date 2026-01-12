@@ -817,3 +817,76 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (39 total: 28 app tests, 11 ui tests)
 
+---
+
+### Implemented: High Priority Feature #3 - OPML Import/Export
+
+**Location:** `src/app.rs`, `src/handler.rs`, `src/ui.rs`
+
+**Description:** Added support for importing and exporting feed lists in OPML format, the industry standard for RSS feed sharing. This enables compatibility with other RSS readers for migration and backup purposes.
+
+**Implementation Details:**
+
+1. **New Dependency:** Added `quick-xml` crate (v0.37) for XML parsing and generation
+
+2. **New App methods:**
+   - `export_opml()` - Exports all feeds to an OPML file at `~/.config/reedy/feeds.opml`
+   - `generate_opml()` - Generates OPML 2.0 XML content with proper structure
+   - `import_opml(path)` - Imports feeds from an OPML file path
+   - `import_opml_content(content)` - Imports feeds from OPML content string
+   - `parse_and_import_opml(content)` - Internal parser that handles OPML structure
+   - `get_opml_path()` - Returns the default OPML file path
+
+3. **OPML Export Features:**
+   - Generates valid OPML 2.0 XML with proper declaration and structure
+   - Groups feeds by category - categorized feeds are nested under category outline elements
+   - Uncategorized feeds appear at the top level of the body
+   - Includes feed title, text, and xmlUrl attributes
+   - Saves to `~/.config/reedy/feeds.opml`
+
+4. **OPML Import Features:**
+   - Parses both category (nested outline) and flat feed structures
+   - Extracts categories from parent outline elements and assigns to feeds
+   - Handles both self-closing (`<outline ... />`) and start-end (`<outline>...</outline>`) tags
+   - Skips duplicate URLs that already exist in the feed list
+   - Uses feed titles from OPML, falls back to URL if title is empty
+   - Supports lowercase `xmlurl` attribute in addition to standard `xmlUrl`
+
+5. **Key bindings (in Feed Manager mode):**
+   - `E` (shift+e) - Export feeds to OPML file
+   - `I` (shift+i) - Import feeds from OPML file
+
+6. **UI Updates:**
+   - Command bar shows `[e/E] Export  [i/I] Import` to indicate both clipboard and OPML options
+   - Help menu documents both export methods (clipboard and OPML)
+   - Status messages inform user of export path or import results
+
+**Example OPML output:**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head><title>Reedy RSS Feeds</title></head>
+  <body>
+    <outline type="rss" text="Uncategorized Feed" title="Uncategorized Feed" xmlUrl="https://example.com/feed.xml"/>
+    <outline text="Tech" title="Tech">
+      <outline type="rss" text="Tech News" title="Tech News" xmlUrl="https://tech.com/rss"/>
+    </outline>
+  </body>
+</opml>
+```
+
+**Files changed:**
+- `Cargo.toml` - Added `quick-xml` dependency
+- `src/app.rs` - Added OPML export/import methods with XML parsing/generation
+- `src/handler.rs` - Added `E` and `I` key bindings for OPML operations
+- `src/ui.rs` - Updated command bar and help menu with OPML documentation
+- `tests/app_tests.rs` - Added 6 new tests for OPML functionality:
+  - `test_opml_generate` - verifies feed setup for export
+  - `test_opml_import_empty_content` - handles empty/invalid OPML
+  - `test_opml_import_basic` - basic import without categories
+  - `test_opml_import_with_categories` - import with category structure
+  - `test_opml_import_skips_duplicates` - skips existing feed URLs
+  - `test_export_opml_empty_feeds` - error handling for empty export
+
+**Tests:** All tests pass (45 total: 34 app tests, 11 ui tests)
+

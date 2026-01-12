@@ -4,9 +4,12 @@ use chrono::DateTime;
 use crossterm::terminal;
 use html2text;
 use log::{debug, error, info, warn};
+use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::{Reader, Writer};
 use reqwest;
 use rss::Channel;
 use serde::{Deserialize, Serialize};
+use std::io::Cursor;
 use std::{collections::HashSet, error, fs, path::PathBuf, time::Duration, time::SystemTime};
 
 /// Default HTTP request timeout in seconds
@@ -803,6 +806,244 @@ impl App {
         self.input_buffer.clear();
         self.import_result = None;
         self.clear_error();
+    }
+
+    /// Exports feeds to OPML format and saves to a file
+    /// Returns the path where the file was saved
+    pub fn export_opml(&mut self) -> AppResult<PathBuf> {
+        if self.rss_feeds.is_empty() {
+            self.error_message = Some("No feeds to export".to_string());
+            return Err("No feeds to export".into());
+        }
+
+        let opml_content = self.generate_opml()?;
+
+        // Save to the config directory
+        let mut path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
+        path.push("reedy");
+        fs::create_dir_all(&path)?;
+        path.push("feeds.opml");
+
+        fs::write(&path, opml_content)?;
+
+        info!("Exported {} feeds to OPML: {}", self.rss_feeds.len(), path.display());
+        self.error_message = Some(format!("Exported {} feeds to {}", self.rss_feeds.len(), path.display()));
+
+        Ok(path)
+    }
+
+    /// Generates OPML XML content from current feeds
+    fn generate_opml(&self) -> AppResult<String> {
+        let mut writer = Writer::new(Cursor::new(Vec::new()));
+
+        // XML declaration
+        writer.write_event(Event::Decl(BytesDecl::new("1.0", Some("UTF-8"), None)))?;
+
+        // OPML root element
+        let mut opml = BytesStart::new("opml");
+        opml.push_attribute(("version", "2.0"));
+        writer.write_event(Event::Start(opml))?;
+
+        // Head section
+        writer.write_event(Event::Start(BytesStart::new("head")))?;
+        writer.write_event(Event::Start(BytesStart::new("title")))?;
+        writer.write_event(Event::Text(BytesText::new("Reedy RSS Feeds")))?;
+        writer.write_event(Event::End(BytesEnd::new("title")))?;
+        writer.write_event(Event::End(BytesEnd::new("head")))?;
+
+        // Body section
+        writer.write_event(Event::Start(BytesStart::new("body")))?;
+
+        // Group feeds by category
+        let feeds_by_category = self.get_feeds_by_category();
+
+        for (category, feeds) in feeds_by_category {
+            match category {
+                Some(cat_name) => {
+                    // Create a category outline
+                    let mut cat_outline = BytesStart::new("outline");
+                    cat_outline.push_attribute(("text", cat_name.as_str()));
+                    cat_outline.push_attribute(("title", cat_name.as_str()));
+                    writer.write_event(Event::Start(cat_outline))?;
+
+                    // Write feeds in this category
+                    for feed in feeds {
+                        let mut outline = BytesStart::new("outline");
+                        outline.push_attribute(("type", "rss"));
+                        outline.push_attribute(("text", feed.title.as_str()));
+                        outline.push_attribute(("title", feed.title.as_str()));
+                        outline.push_attribute(("xmlUrl", feed.url.as_str()));
+                        writer.write_event(Event::Empty(outline))?;
+                    }
+
+                    writer.write_event(Event::End(BytesEnd::new("outline")))?;
+                }
+                None => {
+                    // Write uncategorized feeds at the top level
+                    for feed in feeds {
+                        let mut outline = BytesStart::new("outline");
+                        outline.push_attribute(("type", "rss"));
+                        outline.push_attribute(("text", feed.title.as_str()));
+                        outline.push_attribute(("title", feed.title.as_str()));
+                        outline.push_attribute(("xmlUrl", feed.url.as_str()));
+                        writer.write_event(Event::Empty(outline))?;
+                    }
+                }
+            }
+        }
+
+        writer.write_event(Event::End(BytesEnd::new("body")))?;
+        writer.write_event(Event::End(BytesEnd::new("opml")))?;
+
+        let result = writer.into_inner().into_inner();
+        Ok(String::from_utf8(result)?)
+    }
+
+    /// Imports feeds from an OPML file
+    pub async fn import_opml(&mut self, path: &PathBuf) -> AppResult<()> {
+        let content = fs::read_to_string(path)?;
+        self.parse_and_import_opml(&content).await
+    }
+
+    /// Imports feeds from OPML content string
+    pub async fn import_opml_content(&mut self, content: &str) -> AppResult<()> {
+        self.parse_and_import_opml(content).await
+    }
+
+    /// Parses OPML content and imports feeds
+    async fn parse_and_import_opml(&mut self, content: &str) -> AppResult<()> {
+        let mut reader = Reader::from_str(content);
+        reader.config_mut().trim_text(true);
+
+        let mut added = 0;
+        let mut skipped_duplicate = 0;
+        let mut category_stack: Vec<String> = Vec::new();
+
+        loop {
+            match reader.read_event() {
+                Ok(Event::Start(ref e)) if e.name().as_ref() == b"outline" => {
+                    // This is a start tag (has children) - could be a category or a feed
+                    let mut xml_url: Option<String> = None;
+                    let mut title: Option<String> = None;
+
+                    for attr in e.attributes().flatten() {
+                        match attr.key.as_ref() {
+                            b"xmlUrl" | b"xmlurl" => {
+                                xml_url = Some(String::from_utf8_lossy(&attr.value).to_string());
+                            }
+                            b"text" | b"title" => {
+                                if title.is_none() {
+                                    title = Some(String::from_utf8_lossy(&attr.value).to_string());
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    if xml_url.is_some() {
+                        // It's a feed with a start tag (unusual but valid)
+                        let url = xml_url.unwrap();
+                        if self.rss_feeds.iter().any(|f| f.url == url) {
+                            skipped_duplicate += 1;
+                        } else {
+                            let feed_title = title.filter(|t| !t.is_empty()).unwrap_or_else(|| url.clone());
+                            let category = category_stack.last().cloned();
+                            info!("Adding feed from OPML: {} ({})", feed_title, url);
+                            self.rss_feeds.push(FeedInfo {
+                                url,
+                                title: feed_title,
+                                category,
+                            });
+                            added += 1;
+                        }
+                    } else if let Some(cat_name) = title {
+                        // It's a category - push to stack
+                        category_stack.push(cat_name);
+                    }
+                }
+                Ok(Event::Empty(ref e)) if e.name().as_ref() == b"outline" => {
+                    // Self-closing tag - this is a feed
+                    let mut xml_url: Option<String> = None;
+                    let mut title: Option<String> = None;
+
+                    for attr in e.attributes().flatten() {
+                        match attr.key.as_ref() {
+                            b"xmlUrl" | b"xmlurl" => {
+                                xml_url = Some(String::from_utf8_lossy(&attr.value).to_string());
+                            }
+                            b"text" | b"title" => {
+                                if title.is_none() {
+                                    title = Some(String::from_utf8_lossy(&attr.value).to_string());
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    if let Some(url) = xml_url {
+                        // Skip duplicates
+                        if self.rss_feeds.iter().any(|f| f.url == url) {
+                            skipped_duplicate += 1;
+                            continue;
+                        }
+
+                        // Use the title from OPML or use the URL as fallback
+                        let feed_title = title.filter(|t| !t.is_empty()).unwrap_or_else(|| url.clone());
+                        let category = category_stack.last().cloned();
+
+                        info!("Adding feed from OPML: {} ({})", feed_title, url);
+                        self.rss_feeds.push(FeedInfo {
+                            url,
+                            title: feed_title,
+                            category,
+                        });
+                        added += 1;
+                    }
+                }
+                Ok(Event::End(ref e)) if e.name().as_ref() == b"outline" => {
+                    // Exiting an outline - pop category if we have one
+                    category_stack.pop();
+                }
+                Ok(Event::Eof) => break,
+                Err(e) => {
+                    error!("Error parsing OPML: {}", e);
+                    return Err(format!("Error parsing OPML: {}", e).into());
+                }
+                _ => {}
+            }
+        }
+
+        // Save if we added any feeds
+        if added > 0 {
+            self.save_feeds()?;
+        }
+
+        // Build result message
+        let mut result_parts = Vec::new();
+        if added > 0 {
+            result_parts.push(format!("{} added", added));
+        }
+        if skipped_duplicate > 0 {
+            result_parts.push(format!("{} duplicate", skipped_duplicate));
+        }
+
+        let result_msg = if result_parts.is_empty() {
+            "OPML Import: No feeds found".to_string()
+        } else {
+            format!("OPML Import: {}", result_parts.join(", "))
+        };
+        self.import_result = Some(result_msg.clone());
+        self.error_message = Some(result_msg);
+
+        Ok(())
+    }
+
+    /// Gets the default OPML file path for import
+    pub fn get_opml_path() -> PathBuf {
+        let mut path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
+        path.push("reedy");
+        path.push("feeds.opml");
+        path
     }
 
     /// Starts category setting mode for the currently selected feed
