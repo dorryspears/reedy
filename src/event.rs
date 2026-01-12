@@ -20,15 +20,14 @@ pub enum Event {
 }
 
 /// Terminal event handler.
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct EventHandler {
-    /// Event sender channel.
-    sender: mpsc::UnboundedSender<Event>,
+    /// Event sender channel (kept alive to prevent channel closure).
+    _sender: mpsc::UnboundedSender<Event>,
     /// Event receiver channel.
     receiver: mpsc::UnboundedReceiver<Event>,
-    /// Event handler thread.
-    handler: tokio::task::JoinHandle<()>,
+    /// Event handler thread (kept alive to maintain the spawned task).
+    _handler: tokio::task::JoinHandle<()>,
 }
 
 impl EventHandler {
@@ -75,9 +74,9 @@ impl EventHandler {
             }
         });
         Self {
-            sender,
+            _sender: sender,
             receiver,
-            handler,
+            _handler: handler,
         }
     }
 

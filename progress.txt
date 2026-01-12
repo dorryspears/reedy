@@ -573,3 +573,26 @@ This pattern is inefficient and can cause deadlocks in certain scenarios because
 
 **Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)
 
+---
+
+### Fixed: Low Bug #12 - Dead Code Warning Suppression
+
+**Location:** `src/event.rs:23`
+
+**Problem:** The `EventHandler` struct had an `#[allow(dead_code)]` attribute suppressing warnings for fields that appeared unused. The `sender` field and `handler` field were stored but never directly accessed. However, these fields must exist to keep the event handler functioning:
+- `sender` being dropped would close the mpsc channel
+- `handler` being dropped would detach the tokio task
+
+This is a common pattern in Rust where fields must stay alive for their side effects.
+
+**Solution:**
+1. Renamed `sender` to `_sender` and `handler` to `_handler` following Rust conventions for intentionally unused fields
+2. Removed the `#[allow(dead_code)]` attribute from the struct
+3. Updated the doc comments to explain why these fields exist (to keep the channel and task alive)
+4. Updated the constructor to use the new field names
+
+**Files changed:**
+- `src/event.rs` - Renamed fields, removed `#[allow(dead_code)]`, updated comments and constructor
+
+**Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)
+

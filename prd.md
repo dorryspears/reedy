@@ -124,9 +124,11 @@ pub mod ui;
 1. `load_feeds()`: Now displays an error message to the user when the feeds file exists but cannot be parsed by any format (new, middle, or old). This alerts users to potential file corruption.
 2. `load_config()`: Now logs warnings when config file exists but cannot be read or parsed. Uses default values but informs users via log output.
 
-#### 12. Dead Code Warning Suppression
+#### ~~12. Dead Code Warning Suppression~~ FIXED
 **Location:** `src/event.rs:23`
 **Description:** `#[allow(dead_code)]` attribute on `EventHandler` suggests unused fields that should be cleaned up.
+
+**Fix:** Renamed the unused-but-necessary fields `sender` and `handler` to `_sender` and `_handler` respectively. This follows Rust conventions for intentionally unused fields that must remain in scope (the sender prevents channel closure; the handler keeps the tokio task alive). Removed the `#[allow(dead_code)]` attribute and updated comments to explain why these fields exist.
 
 ---
 
