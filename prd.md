@@ -72,7 +72,7 @@ Reedy is a terminal-based RSS/Atom feed reader built with Rust. It provides a ke
 
 **Fix:** Deleted `src/rss_manager.rs` (629 lines of dead code) and removed the module declarations from both `src/main.rs` and `src/lib.rs`.
 
-#### 7. Module Double Declaration
+#### ~~7. Module Double Declaration~~ FIXED
 **Location:** `src/main.rs:18-24`
 **Description:** Modules are declared in both `main.rs` and `lib.rs`, which can cause confusion and potential compilation issues.
 
@@ -87,6 +87,8 @@ pub mod ui;
 ```
 
 **Impact:** Code organization issues; potential for module resolution conflicts.
+
+**Fix:** Removed the duplicate module declarations from `main.rs`. The modules are already properly declared in `lib.rs` and exported via the `reedy` crate, which `main.rs` imports. This eliminates the redundancy and potential for confusion.
 
 #### 8. Hardcoded Page Sizes
 **Location:** `src/app.rs:311-313`, `src/app.rs:597-600`
@@ -220,8 +222,8 @@ https://news.site.com/atom.xml
 
 ## Technical Debt
 
-1. **Remove `rss_manager.rs`** - Dead code that duplicates `app.rs` functionality
-2. **Consolidate module declarations** - Remove duplicate declarations from `main.rs`
+1. ~~**Remove `rss_manager.rs`**~~ - ✓ DONE - Dead code removed
+2. ~~**Consolidate module declarations**~~ - ✓ DONE - Duplicate declarations removed from `main.rs`
 3. **Add comprehensive test coverage** - Current tests only cover basic state transitions
 4. **Add integration tests** - Test actual feed fetching with mock server
 5. **Document public API** - Add rustdoc comments to all public functions

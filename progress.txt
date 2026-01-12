@@ -114,3 +114,20 @@
   - `test_select_previous_empty_feed_manager`
 
 **Tests:** All tests pass (13 total: 8 app tests, 5 ui tests)
+
+---
+
+### Fixed: Medium Bug #7 - Module Double Declaration
+
+**Location:** `src/main.rs:18-22`
+
+**Problem:** Modules (`app`, `event`, `handler`, `tui`, `ui`) were declared in both `main.rs` and `lib.rs`. This created confusion about which module was being used and potential compilation issues. The `main.rs` was already importing from `reedy::` (the lib crate) but then redundantly re-declared the same modules.
+
+**Solution:**
+1. Removed the duplicate module declarations from `src/main.rs` (lines 18-22)
+2. The modules remain properly declared in `lib.rs` and are accessed via the `reedy` crate import
+
+**Files changed:**
+- `src/main.rs` - Removed 5 redundant `pub mod` declarations
+
+**Tests:** All tests pass (16 total: 11 app tests, 5 ui tests)

@@ -15,12 +15,6 @@ use reedy::{
     tui::Tui,
 };
 
-pub mod app;
-pub mod event;
-pub mod handler;
-pub mod tui;
-pub mod ui;
-
 #[tokio::main]
 async fn main() -> AppResult<()> {
     // Load .env file
