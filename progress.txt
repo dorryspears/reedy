@@ -2,6 +2,26 @@
 
 ## 2026-01-12
 
+### Fixed: Medium Bug #6 - Duplicate Code Between `app.rs` and `rss_manager.rs`
+
+**Location:** `src/rss_manager.rs`
+
+**Problem:** The file `rss_manager.rs` contained 629 lines of dead code that duplicated nearly identical implementations found in `app.rs`. This included `FeedItem`, `SavedState`, `CachedFeed` structs, and many feed management methods. The module was declared in both `main.rs` and `lib.rs` but never actually imported or used anywhere in the codebase.
+
+**Solution:**
+1. Deleted the entire `src/rss_manager.rs` file (629 lines of dead code)
+2. Removed the `pub mod rss_manager;` declaration from `src/main.rs`
+3. Removed the `pub mod rss_manager;` declaration from `src/lib.rs`
+
+**Files changed:**
+- `src/rss_manager.rs` - Deleted
+- `src/main.rs` - Removed `rss_manager` module declaration
+- `src/lib.rs` - Removed `rss_manager` module declaration
+
+**Tests:** All tests pass (16 total: 11 app tests, 5 ui tests)
+
+---
+
 ### Fixed: High Bug #5 - Favorites View Not Updated on Unfavorite
 
 **Location:** `src/app.rs:866-893`

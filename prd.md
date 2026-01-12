@@ -64,11 +64,13 @@ Reedy is a terminal-based RSS/Atom feed reader built with Rust. It provides a ke
 
 ### Medium
 
-#### 6. Duplicate Code Between `app.rs` and `rss_manager.rs`
+#### ~~6. Duplicate Code Between `app.rs` and `rss_manager.rs`~~ FIXED
 **Location:** `src/app.rs`, `src/rss_manager.rs`
 **Description:** Both files contain nearly identical implementations of `FeedItem`, `SavedState`, `CachedFeed`, and many feed management methods. `rss_manager.rs` appears to be unused dead code.
 
 **Impact:** Maintenance burden; confusion about which module to use; ~629 lines of dead code.
+
+**Fix:** Deleted `src/rss_manager.rs` (629 lines of dead code) and removed the module declarations from both `src/main.rs` and `src/lib.rs`.
 
 #### 7. Module Double Declaration
 **Location:** `src/main.rs:18-24`
