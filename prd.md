@@ -205,9 +205,17 @@ https://news.site.com/atom.xml
 
 ### Medium Priority
 
-#### 7. Feed Categories/Tags
+#### ~~7. Feed Categories/Tags~~ DONE
 **Description:** Allow users to organize feeds into custom categories or tag them.
 **Value:** Better organization for users with many subscriptions.
+
+**Implementation:**
+- Added optional `category` field to `FeedInfo` struct with `#[serde(default)]` for backwards compatibility
+- Press `t` in Feed Manager to set a category for the selected feed
+- Categories are displayed as section headers in Feed Manager, grouping feeds visually
+- Uncategorized feeds appear first, followed by categorized feeds sorted alphabetically by category
+- Enter empty text to remove a category from a feed
+- Category is persisted in the saved state file
 
 #### 8. Auto-Refresh Interval
 **Description:** Automatically refresh feeds at a configurable interval.

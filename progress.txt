@@ -430,3 +430,59 @@ This pattern is inefficient and can cause deadlocks in certain scenarios because
 - `src/app.rs` - Added `Config` struct, config methods, `config` field to `App`, updated all HTTP client calls
 
 **Tests:** All tests pass (23 total: 18 app tests, 5 ui tests)
+
+---
+
+### Implemented: Medium Priority Feature #7 - Feed Categories/Tags
+
+**Location:** `src/app.rs`, `src/handler.rs`, `src/ui.rs`
+
+**Description:** Added the ability to organize feeds into custom categories. This helps users with many subscriptions to better organize and navigate their feed list.
+
+**Implementation Details:**
+
+1. **Updated FeedInfo struct:** Added optional `category` field with `#[serde(default)]` for backwards compatibility:
+   ```rust
+   pub struct FeedInfo {
+       pub url: String,
+       pub title: String,
+       #[serde(default)]
+       pub category: Option<String>,
+   }
+   ```
+
+2. **New InputMode:** Added `InputMode::SettingCategory` to handle category text input
+
+3. **New App methods:**
+   - `start_setting_category()` - enters category setting mode, pre-fills with existing category
+   - `cancel_setting_category()` - cancels without saving changes
+   - `set_category()` - saves the category (or clears it if empty)
+   - `get_categories()` - returns sorted list of unique categories
+   - `get_feeds_by_category()` - returns feeds grouped by category
+
+4. **Key bindings (in Feed Manager mode):**
+   - `t` - Start category setting mode for selected feed
+   - `Enter` - Save the category
+   - `Esc` - Cancel category setting
+
+5. **UI Updates in Feed Manager:**
+   - Feeds are now displayed grouped by category with section headers
+   - Section headers use magenta color and bold formatting: "── Category Name ──"
+   - Uncategorized feeds appear first under "── Uncategorized ──"
+   - Categories are sorted alphabetically
+   - Feeds within each category maintain their original order
+   - Command bar shows `[t] Tag/Category` option
+   - Help menu updated with category documentation
+
+6. **Backwards compatibility:**
+   - Existing saved state files work without modification
+   - The `#[serde(default)]` attribute ensures missing category fields default to `None`
+   - All FeedInfo creation sites updated to include `category: None`
+
+**Files changed:**
+- `src/app.rs` - Added `category` field to `FeedInfo`, new `InputMode::SettingCategory`, category management methods
+- `src/handler.rs` - Added `t` key binding, `SettingCategory` input mode handler
+- `src/ui.rs` - Updated `render_feed_manager()` to display grouped feeds, updated command bar and help menu
+- `tests/app_tests.rs` - Added 6 new tests for category functionality
+
+**Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)

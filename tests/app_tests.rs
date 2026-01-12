@@ -1,4 +1,4 @@
-use reedy::app::{App, FeedItem, InputMode, PageMode};
+use reedy::app::{App, FeedInfo, FeedItem, InputMode, PageMode};
 use std::time::SystemTime;
 
 #[test]
@@ -437,4 +437,172 @@ fn test_export_empty_feeds() {
     // Export should set an error message
     app.export_feeds_to_clipboard();
     assert_eq!(app.error_message, Some("No feeds to export".to_string()));
+}
+
+#[test]
+fn test_category_setting_mode() {
+    let mut app = App::default();
+
+    // Add a test feed
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/feed.xml".to_string(),
+        title: "Test Feed".to_string(),
+        category: None,
+    });
+    app.selected_index = Some(0);
+    app.page_mode = PageMode::FeedManager;
+
+    // Start category setting mode
+    app.start_setting_category();
+    assert_eq!(app.input_mode, InputMode::SettingCategory);
+    assert!(app.input_buffer.is_empty()); // No existing category
+
+    // Set a category
+    app.input_buffer = "Tech".to_string();
+    app.set_category();
+
+    assert_eq!(app.input_mode, InputMode::Normal);
+    assert!(app.input_buffer.is_empty());
+    assert_eq!(app.rss_feeds[0].category, Some("Tech".to_string()));
+}
+
+#[test]
+fn test_category_prefill_existing() {
+    let mut app = App::default();
+
+    // Add a feed with existing category
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/feed.xml".to_string(),
+        title: "Test Feed".to_string(),
+        category: Some("News".to_string()),
+    });
+    app.selected_index = Some(0);
+    app.page_mode = PageMode::FeedManager;
+
+    // Start category setting mode - should prefill with existing category
+    app.start_setting_category();
+    assert_eq!(app.input_mode, InputMode::SettingCategory);
+    assert_eq!(app.input_buffer, "News");
+}
+
+#[test]
+fn test_clear_category() {
+    let mut app = App::default();
+
+    // Add a feed with existing category
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/feed.xml".to_string(),
+        title: "Test Feed".to_string(),
+        category: Some("Tech".to_string()),
+    });
+    app.selected_index = Some(0);
+    app.page_mode = PageMode::FeedManager;
+
+    // Set empty category to clear it
+    app.start_setting_category();
+    app.input_buffer.clear();
+    app.set_category();
+
+    assert_eq!(app.rss_feeds[0].category, None);
+}
+
+#[test]
+fn test_cancel_category_setting() {
+    let mut app = App::default();
+
+    // Add a feed
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/feed.xml".to_string(),
+        title: "Test Feed".to_string(),
+        category: Some("Original".to_string()),
+    });
+    app.selected_index = Some(0);
+    app.page_mode = PageMode::FeedManager;
+
+    // Start and cancel category setting
+    app.start_setting_category();
+    app.input_buffer = "NewCategory".to_string();
+    app.cancel_setting_category();
+
+    assert_eq!(app.input_mode, InputMode::Normal);
+    assert!(app.input_buffer.is_empty());
+    // Original category should be preserved
+    assert_eq!(app.rss_feeds[0].category, Some("Original".to_string()));
+}
+
+#[test]
+fn test_get_categories() {
+    let mut app = App::default();
+
+    // Add feeds with various categories
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/1.xml".to_string(),
+        title: "Feed 1".to_string(),
+        category: Some("Tech".to_string()),
+    });
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/2.xml".to_string(),
+        title: "Feed 2".to_string(),
+        category: Some("News".to_string()),
+    });
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/3.xml".to_string(),
+        title: "Feed 3".to_string(),
+        category: Some("Tech".to_string()), // Duplicate category
+    });
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/4.xml".to_string(),
+        title: "Feed 4".to_string(),
+        category: None, // Uncategorized
+    });
+
+    let categories = app.get_categories();
+    assert_eq!(categories.len(), 2); // Only "News" and "Tech", sorted
+    assert_eq!(categories[0], "News");
+    assert_eq!(categories[1], "Tech");
+}
+
+#[test]
+fn test_get_feeds_by_category() {
+    let mut app = App::default();
+
+    // Add feeds with various categories
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/1.xml".to_string(),
+        title: "Tech Feed 1".to_string(),
+        category: Some("Tech".to_string()),
+    });
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/2.xml".to_string(),
+        title: "Uncategorized Feed".to_string(),
+        category: None,
+    });
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/3.xml".to_string(),
+        title: "News Feed".to_string(),
+        category: Some("News".to_string()),
+    });
+    app.rss_feeds.push(FeedInfo {
+        url: "https://example.com/4.xml".to_string(),
+        title: "Tech Feed 2".to_string(),
+        category: Some("Tech".to_string()),
+    });
+
+    let grouped = app.get_feeds_by_category();
+
+    // Should have 3 groups: None (uncategorized), News, Tech
+    assert_eq!(grouped.len(), 3);
+
+    // First group should be uncategorized (None comes first)
+    assert_eq!(grouped[0].0, None);
+    assert_eq!(grouped[0].1.len(), 1);
+    assert_eq!(grouped[0].1[0].title, "Uncategorized Feed");
+
+    // Second group should be News
+    assert_eq!(grouped[1].0, Some("News".to_string()));
+    assert_eq!(grouped[1].1.len(), 1);
+
+    // Third group should be Tech with 2 feeds
+    assert_eq!(grouped[2].0, Some("Tech".to_string()));
+    assert_eq!(grouped[2].1.len(), 2);
 }

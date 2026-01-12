@@ -51,6 +51,7 @@ pub enum InputMode {
     Help,
     Searching,
     Importing,
+    SettingCategory,
 }
 
 #[derive(Debug, PartialEq)]
@@ -71,11 +72,13 @@ pub struct FeedItem {
     pub feed_url: String,
 }
 
-/// Represents a feed subscription with its URL and title
+/// Represents a feed subscription with its URL, title, and optional category
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FeedInfo {
     pub url: String,
     pub title: String,
+    #[serde(default)]
+    pub category: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -344,6 +347,7 @@ impl App {
                             .map(|url| FeedInfo {
                                 title: url.clone(),
                                 url,
+                                category: None,
                             })
                             .collect();
                         self.read_items = middle_saved.read_items;
@@ -369,6 +373,7 @@ impl App {
                                 .map(|url| FeedInfo {
                                     title: url.clone(),
                                     url,
+                                    category: None,
                                 })
                                 .collect();
                             self.read_items = old_saved.read_items;
@@ -562,6 +567,85 @@ impl App {
         self.clear_error();
     }
 
+    /// Starts category setting mode for the currently selected feed
+    pub fn start_setting_category(&mut self) {
+        if self.selected_index.is_some() && !self.rss_feeds.is_empty() {
+            self.input_mode = InputMode::SettingCategory;
+            // Pre-fill with current category if it exists
+            if let Some(index) = self.selected_index {
+                if let Some(feed) = self.rss_feeds.get(index) {
+                    self.input_buffer = feed.category.clone().unwrap_or_default();
+                }
+            }
+        }
+    }
+
+    /// Cancels category setting mode
+    pub fn cancel_setting_category(&mut self) {
+        self.input_mode = InputMode::Normal;
+        self.input_buffer.clear();
+        self.clear_error();
+    }
+
+    /// Sets the category for the currently selected feed
+    pub fn set_category(&mut self) {
+        if let Some(index) = self.selected_index {
+            if let Some(feed) = self.rss_feeds.get_mut(index) {
+                let category = self.input_buffer.trim().to_string();
+                if category.is_empty() {
+                    feed.category = None;
+                    info!("Cleared category for feed: {}", feed.title);
+                } else {
+                    feed.category = Some(category.clone());
+                    info!("Set category '{}' for feed: {}", category, feed.title);
+                }
+                if let Err(e) = self.save_feeds() {
+                    error!("Failed to save feeds after setting category: {}", e);
+                    self.error_message = Some("Failed to save category".to_string());
+                }
+            }
+        }
+        self.input_mode = InputMode::Normal;
+        self.input_buffer.clear();
+    }
+
+    /// Returns a sorted list of unique categories used by feeds
+    pub fn get_categories(&self) -> Vec<String> {
+        let mut categories: Vec<String> = self
+            .rss_feeds
+            .iter()
+            .filter_map(|f| f.category.clone())
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        categories.sort();
+        categories
+    }
+
+    /// Returns feeds grouped by category. Uncategorized feeds are grouped under None.
+    pub fn get_feeds_by_category(&self) -> Vec<(Option<String>, Vec<&FeedInfo>)> {
+        use std::collections::BTreeMap;
+
+        let mut grouped: BTreeMap<Option<String>, Vec<&FeedInfo>> = BTreeMap::new();
+
+        for feed in &self.rss_feeds {
+            grouped
+                .entry(feed.category.clone())
+                .or_insert_with(Vec::new)
+                .push(feed);
+        }
+
+        // Convert to Vec and sort: None (uncategorized) first, then alphabetically by category
+        let mut result: Vec<(Option<String>, Vec<&FeedInfo>)> = grouped.into_iter().collect();
+        result.sort_by(|a, b| match (&a.0, &b.0) {
+            (None, None) => std::cmp::Ordering::Equal,
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (Some(a), Some(b)) => a.cmp(b),
+        });
+        result
+    }
+
     /// Imports feeds from the input buffer (one URL per line)
     pub async fn import_feeds(&mut self) -> AppResult<()> {
         let urls: Vec<String> = self
@@ -591,7 +675,7 @@ impl App {
             match Self::validate_and_get_feed_title(&url, self.config.http_timeout_secs).await {
                 Ok(Some(title)) => {
                     info!("Successfully validated and added feed: {} ({})", title, url);
-                    self.rss_feeds.push(FeedInfo { url, title });
+                    self.rss_feeds.push(FeedInfo { url, title, category: None });
                     added += 1;
                 }
                 Ok(None) => {
@@ -683,6 +767,7 @@ impl App {
                 self.rss_feeds.push(FeedInfo {
                     url: self.input_buffer.clone(),
                     title,
+                    category: None,
                 });
                 self.save_feeds()?;
                 self.input_buffer.clear();

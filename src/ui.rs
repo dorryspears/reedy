@@ -208,13 +208,31 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
         ])
         .split(area);
 
-    // Render the feed list
-    let items: Vec<ListItem> = app
-        .rss_feeds
-        .iter()
-        .enumerate()
-        .map(|(i, feed_info)| {
-            let style = if Some(i) == app.selected_index {
+    // Get feeds grouped by category
+    let feeds_by_category = app.get_feeds_by_category();
+
+    // Build list items with category headers
+    let mut items: Vec<ListItem> = Vec::new();
+    let mut feed_index = 0;
+
+    for (category, feeds) in &feeds_by_category {
+        // Add category header
+        let header_text = match category {
+            Some(cat) => format!("── {} ──", cat),
+            None => "── Uncategorized ──".to_string(),
+        };
+        items.push(
+            ListItem::new(Line::from(Span::styled(
+                header_text,
+                Style::default()
+                    .fg(Color::Magenta)
+                    .add_modifier(Modifier::BOLD),
+            )))
+        );
+
+        // Add feeds in this category
+        for feed_info in feeds {
+            let style = if Some(feed_index) == app.selected_index {
                 Style::default()
                     .fg(Color::Yellow)
                     .add_modifier(Modifier::REVERSED)
@@ -233,9 +251,9 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
                 String::new()
             };
 
-            // Calculate max width for title, accounting for count display
+            // Calculate max width for title, accounting for count display and indent
             let count_len = count_display.len();
-            let title_max_width = chunks[0].width.saturating_sub(8 + count_len as u16) as usize; // Account for index, spacing, and count
+            let title_max_width = chunks[0].width.saturating_sub(12 + count_len as u16) as usize; // Account for index, spacing, indent, and count
             let truncated_title = truncate_text(&feed_info.title, title_max_width as u16);
 
             // Style for unread count - highlight if there are unread items
@@ -245,14 +263,17 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
                 Style::default().fg(Color::DarkGray)
             };
 
-            ListItem::new(Line::from(vec![
-                Span::raw(format!("{}. ", i + 1)),
-                Span::raw(truncated_title),
-                Span::styled(count_display, count_style),
-            ]))
-            .style(style)
-        })
-        .collect();
+            items.push(
+                ListItem::new(Line::from(vec![
+                    Span::raw(format!("  {}. ", feed_index + 1)),
+                    Span::raw(truncated_title),
+                    Span::styled(count_display, count_style),
+                ]))
+                .style(style)
+            );
+            feed_index += 1;
+        }
+    }
 
     let list = List::new(items)
         .block(Block::default().title("RSS Feeds").borders(Borders::ALL))
@@ -346,6 +367,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
             )]),
             Line::from("a              - Add new feed"),
             Line::from("d              - Delete selected feed"),
+            Line::from("t              - Set category/tag for selected feed"),
             Line::from("e              - Export feeds to clipboard"),
             Line::from("i              - Import feeds from clipboard"),
             Line::from("c              - Refresh feed cache"),
@@ -446,7 +468,7 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
             }
             PageMode::FeedManager => match app.input_mode {
                 InputMode::Normal => {
-                    "[↑↓] Navigate  [a] Add  [d] Delete  [e] Export  [i] Import  [m] Back  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [a] Add  [d] Delete  [t] Tag/Category  [e] Export  [i] Import  [m] Back  [?] Help  [q] Quit".to_string()
                 }
                 InputMode::Adding => format!("Enter RSS URL: {}", app.input_buffer),
                 InputMode::Deleting => {
@@ -455,6 +477,9 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
                 InputMode::Importing => {
                     let line_count = app.input_buffer.lines().count();
                     format!("Import feeds ({} URLs pasted) - [Enter] Import  [Esc] Cancel", line_count)
+                }
+                InputMode::SettingCategory => {
+                    format!("Set category: {}█  [Enter] Save  [Esc] Cancel  (empty to remove)", app.input_buffer)
                 }
                 InputMode::FeedManager => "[m] Back to Feeds  [?] Help".to_string(),
                 InputMode::Help | InputMode::Searching => unreachable!(), // These cases are already handled above

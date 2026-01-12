@@ -123,6 +123,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 KeyCode::Char('d') => {
                     app.start_deleting();
                 }
+                KeyCode::Char('t') => {
+                    app.start_setting_category();
+                }
                 KeyCode::Char('c') => {
                     app.cache_all_feeds().await;
                 }
@@ -213,6 +216,21 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 }
                 KeyCode::Esc => {
                     app.cancel_importing();
+                }
+                KeyCode::Char(c) => {
+                    app.input_buffer.push(c);
+                }
+                KeyCode::Backspace => {
+                    app.input_buffer.pop();
+                }
+                _ => {}
+            },
+            InputMode::SettingCategory => match key_event.code {
+                KeyCode::Enter => {
+                    app.set_category();
+                }
+                KeyCode::Esc => {
+                    app.cancel_setting_category();
                 }
                 KeyCode::Char(c) => {
                     app.input_buffer.push(c);
