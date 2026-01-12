@@ -866,7 +866,8 @@ impl App {
     pub fn toggle_favorite(&mut self) {
         if let Some(index) = self.selected_index {
             if let Some(item) = self.current_feed_content.get(index) {
-                if self.favorites.contains(&item.id) {
+                let was_favorite = self.favorites.contains(&item.id);
+                if was_favorite {
                     self.favorites.remove(&item.id);
                     debug!("Removed item from favorites: {}", item.title);
                 } else {
@@ -876,6 +877,17 @@ impl App {
                 self.save_state().unwrap_or_else(|e| {
                     error!("Failed to save favorites: {}", e);
                 });
+
+                // If we're in Favorites view and just unfavorited an item, remove it from the list
+                if was_favorite && self.page_mode == PageMode::Favorites {
+                    self.current_feed_content.remove(index);
+                    // Adjust selected index
+                    if self.current_feed_content.is_empty() {
+                        self.selected_index = None;
+                    } else if index >= self.current_feed_content.len() {
+                        self.selected_index = Some(self.current_feed_content.len() - 1);
+                    }
+                }
             }
         }
     }

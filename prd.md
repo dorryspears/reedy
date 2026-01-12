@@ -52,11 +52,13 @@ Reedy is a terminal-based RSS/Atom feed reader built with Rust. It provides a ke
 
 **Fix:** Added a `create_http_client()` helper function that creates a `reqwest::Client` with a 30-second timeout. All HTTP requests now use this client instead of the bare `reqwest::get()` function.
 
-#### 5. Favorites View Not Updated on Unfavorite
-**Location:** `src/app.rs:860-875`
+#### ~~5. Favorites View Not Updated on Unfavorite~~ FIXED
+**Location:** `src/app.rs:866-893`
 **Description:** When unfavoriting an item while in Favorites view, the item remains visible until the user manually refreshes or toggles the view.
 
 **Impact:** Confusing UX where unfavorited items persist in the favorites list.
+
+**Fix:** Modified `toggle_favorite()` to check if in Favorites view after unfavoriting. If so, the item is immediately removed from `current_feed_content` and the `selected_index` is adjusted appropriately (moved to previous item if at end, or set to None if list becomes empty).
 
 ---
 

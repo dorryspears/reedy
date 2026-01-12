@@ -2,6 +2,31 @@
 
 ## 2026-01-12
 
+### Fixed: High Bug #5 - Favorites View Not Updated on Unfavorite
+
+**Location:** `src/app.rs:866-893`
+
+**Problem:** When unfavoriting an item while in Favorites view, the item remained visible until the user manually refreshed or toggled the view. This was confusing UX.
+
+**Solution:**
+1. Modified `toggle_favorite()` to track whether the item was a favorite before toggling
+2. After unfavoriting, if in Favorites view (`PageMode::Favorites`), the item is immediately removed from `current_feed_content`
+3. The `selected_index` is adjusted appropriately:
+   - If the list becomes empty, `selected_index` is set to `None`
+   - If the removed item was at the end, `selected_index` moves to the new last item
+   - Otherwise, `selected_index` stays the same (now pointing to the next item)
+
+**Files changed:**
+- `src/app.rs` - Modified `toggle_favorite()` to remove unfavorited items from view in Favorites mode
+- `tests/app_tests.rs` - Added 3 new tests:
+  - `test_unfavorite_removes_from_favorites_view` - verifies item removal and index adjustment
+  - `test_unfavorite_last_item_in_favorites_view` - verifies empty list handling
+  - `test_unfavorite_does_not_remove_in_feedlist_view` - verifies behavior unchanged in normal view
+
+**Tests:** All tests pass (16 total: 11 app tests, 5 ui tests)
+
+---
+
 ### Fixed: High Bug #4 - No HTTP Request Timeouts
 
 **Location:** `src/app.rs` - multiple locations using `reqwest::get()`

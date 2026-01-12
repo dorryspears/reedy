@@ -114,3 +114,105 @@ fn test_select_previous_empty_feed_manager() {
     app.select_previous();
     assert_eq!(app.selected_index, Some(0));
 }
+
+#[test]
+fn test_unfavorite_removes_from_favorites_view() {
+    let mut app = App::default();
+
+    // Add some test items
+    let item1 = FeedItem {
+        title: "Item 1".to_string(),
+        description: "Description 1".to_string(),
+        link: "https://example.com/1".to_string(),
+        published: Some(SystemTime::now()),
+        id: "id-1".to_string(),
+    };
+    let item2 = FeedItem {
+        title: "Item 2".to_string(),
+        description: "Description 2".to_string(),
+        link: "https://example.com/2".to_string(),
+        published: Some(SystemTime::now()),
+        id: "id-2".to_string(),
+    };
+
+    // Add items to current feed content and mark them as favorites
+    app.current_feed_content.push(item1.clone());
+    app.current_feed_content.push(item2.clone());
+    app.favorites.insert(item1.id.clone());
+    app.favorites.insert(item2.id.clone());
+
+    // Switch to Favorites view
+    app.page_mode = PageMode::Favorites;
+    app.selected_index = Some(0);
+
+    // Unfavorite the first item
+    app.toggle_favorite();
+
+    // The item should be removed from current_feed_content
+    assert_eq!(app.current_feed_content.len(), 1);
+    assert_eq!(app.current_feed_content[0].id, "id-2");
+    // Selected index should remain at 0 (now pointing to item2)
+    assert_eq!(app.selected_index, Some(0));
+    // Item 1 should no longer be in favorites
+    assert!(!app.favorites.contains(&item1.id));
+}
+
+#[test]
+fn test_unfavorite_last_item_in_favorites_view() {
+    let mut app = App::default();
+
+    // Add a single test item
+    let item = FeedItem {
+        title: "Only Item".to_string(),
+        description: "Description".to_string(),
+        link: "https://example.com/only".to_string(),
+        published: Some(SystemTime::now()),
+        id: "only-id".to_string(),
+    };
+
+    // Add item to current feed content and mark as favorite
+    app.current_feed_content.push(item.clone());
+    app.favorites.insert(item.id.clone());
+
+    // Switch to Favorites view
+    app.page_mode = PageMode::Favorites;
+    app.selected_index = Some(0);
+
+    // Unfavorite the only item
+    app.toggle_favorite();
+
+    // The list should now be empty
+    assert_eq!(app.current_feed_content.len(), 0);
+    // Selected index should be None since list is empty
+    assert_eq!(app.selected_index, None);
+}
+
+#[test]
+fn test_unfavorite_does_not_remove_in_feedlist_view() {
+    let mut app = App::default();
+
+    // Add a test item
+    let item = FeedItem {
+        title: "Test Item".to_string(),
+        description: "Description".to_string(),
+        link: "https://example.com/test".to_string(),
+        published: Some(SystemTime::now()),
+        id: "test-id".to_string(),
+    };
+
+    // Add item to current feed content and mark as favorite
+    app.current_feed_content.push(item.clone());
+    app.favorites.insert(item.id.clone());
+
+    // Stay in FeedList view (not Favorites)
+    app.page_mode = PageMode::FeedList;
+    app.selected_index = Some(0);
+
+    // Unfavorite the item
+    app.toggle_favorite();
+
+    // The item should still be in current_feed_content (only removed in Favorites view)
+    assert_eq!(app.current_feed_content.len(), 1);
+    // But it should no longer be a favorite
+    assert!(!app.favorites.contains(&item.id));
+}
