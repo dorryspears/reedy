@@ -486,3 +486,31 @@ This pattern is inefficient and can cause deadlocks in certain scenarios because
 - `tests/app_tests.rs` - Added 6 new tests for category functionality
 
 **Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)
+
+---
+
+### Fixed: Low Bug #11 - Silent Error Handling
+
+**Location:** `src/app.rs` - `load_feeds()` and `load_config()` functions
+
+**Problem:** Some errors were silently ignored, making debugging difficult:
+1. When loading the feeds file (`feeds.json`), if all three format parsing attempts (new, middle, old) failed, the app silently continued with empty feeds. Users had no idea their file was corrupted or malformed.
+2. When loading the config file (`config.json`), if the file existed but couldn't be read or parsed, the app silently used defaults without informing the user.
+
+**Solution:**
+1. **`load_feeds()` (line ~386)**: Added error handling for the case when all parsing formats fail. Now:
+   - Logs an error message with the file path
+   - Sets `self.error_message` to display a warning to the user about potential file corruption
+
+2. **`load_config()` (lines 217-241)**: Rewrote using match expressions instead of nested `if let Ok()`. Now:
+   - Logs a warning with the specific error when file reading fails
+   - Logs a warning with the parse error when JSON parsing fails
+   - Still returns default config, but user is informed via log output
+
+3. **Added `warn` macro import**: Added `warn` to the log imports for the new warning messages.
+
+**Files changed:**
+- `src/app.rs` - Added error reporting in `load_feeds()`, improved error logging in `load_config()`, added `warn` to imports
+
+**Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)
+

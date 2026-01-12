@@ -116,9 +116,13 @@ pub mod ui;
 
 **Fix:** Removed the useless `debug!("test");` statement from `select_feed()`. The function already has a proper debug statement logging meaningful context.
 
-#### 11. Silent Error Handling
+#### ~~11. Silent Error Handling~~ FIXED
 **Location:** `src/app.rs:234-252`, various `unwrap_or_default()` calls
 **Description:** Some errors are silently ignored, making debugging difficult. Old format parsing failures don't report to user.
+
+**Fix:** Added error reporting for critical silent failures:
+1. `load_feeds()`: Now displays an error message to the user when the feeds file exists but cannot be parsed by any format (new, middle, or old). This alerts users to potential file corruption.
+2. `load_config()`: Now logs warnings when config file exists but cannot be read or parsed. Uses default values but informs users via log output.
 
 #### 12. Dead Code Warning Suppression
 **Location:** `src/event.rs:23`

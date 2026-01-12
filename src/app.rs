@@ -3,7 +3,7 @@ use base64;
 use chrono::DateTime;
 use crossterm::terminal;
 use html2text;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
 use reqwest;
 use rss::Channel;
 use serde::{Deserialize, Serialize};
@@ -217,9 +217,23 @@ impl App {
     pub fn load_config() -> Config {
         let config_path = Self::get_config_path();
         if config_path.exists() {
-            if let Ok(contents) = fs::read_to_string(&config_path) {
-                if let Ok(config) = serde_json::from_str::<Config>(&contents) {
-                    return config;
+            match fs::read_to_string(&config_path) {
+                Ok(contents) => match serde_json::from_str::<Config>(&contents) {
+                    Ok(config) => return config,
+                    Err(e) => {
+                        warn!(
+                            "Failed to parse config file {}: {}. Using defaults.",
+                            config_path.display(),
+                            e
+                        );
+                    }
+                },
+                Err(e) => {
+                    warn!(
+                        "Failed to read config file {}: {}. Using defaults.",
+                        config_path.display(),
+                        e
+                    );
                 }
             }
         }
@@ -383,6 +397,16 @@ impl App {
                                 self.rss_feeds.len(),
                                 self.save_path.display()
                             );
+                        } else {
+                            // All parsing attempts failed - report to user
+                            error!(
+                                "Failed to parse feeds file: {}. File may be corrupted.",
+                                self.save_path.display()
+                            );
+                            self.error_message = Some(format!(
+                                "Warning: Could not parse {}. Your feeds file may be corrupted.",
+                                self.save_path.display()
+                            ));
                         }
                     }
                 }
