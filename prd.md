@@ -237,9 +237,18 @@ https://news.site.com/atom.xml
 - Manual refresh (via `c` key) resets the auto-refresh timer
 - Auto-refresh is skipped during input modes (adding, searching, etc.)
 
-#### 9. Article Preview Pane
+#### ~~9. Article Preview Pane~~ DONE
 **Description:** Show full article content in a dedicated pane within the TUI.
 **Value:** Read articles without leaving the terminal.
+
+**Implementation:**
+- Press `p` in FeedList or Favorites view to open the article preview pane
+- Preview displays: article title, feed name, date, link, read/favorite status, and full description
+- Navigation: `↑/k` scroll up, `↓/j` scroll down, `PgUp/PgDn` page scroll, `g` scroll to top
+- Actions in preview: `o` open in browser, `r` toggle read, `f` toggle favorite
+- Press `Esc`, `q`, or `p` to close preview and return to feed list
+- Content is word-wrapped to fit terminal width
+- Scroll position indicator shows current line and total lines when content overflows
 
 #### 10. Configurable Cache Duration
 **Description:** Let users configure how long feed cache remains valid (currently hardcoded to 1 hour).

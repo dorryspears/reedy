@@ -37,6 +37,41 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
         return Ok(());
     }
 
+    // Handle preview mode
+    if app.input_mode == InputMode::Preview {
+        match key_event.code {
+            KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('p') => {
+                app.close_preview();
+            }
+            KeyCode::Up | KeyCode::Char('k') => {
+                app.preview_scroll_up();
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                app.preview_scroll_down();
+            }
+            KeyCode::PageUp => {
+                app.preview_page_up();
+            }
+            KeyCode::PageDown => {
+                app.preview_page_down();
+            }
+            KeyCode::Char('o') => {
+                app.open_selected_feed();
+            }
+            KeyCode::Char('r') => {
+                app.toggle_read_status();
+            }
+            KeyCode::Char('f') => {
+                app.toggle_favorite();
+            }
+            KeyCode::Char('g') => {
+                app.preview_scroll = 0;
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     match app.page_mode {
         PageMode::FeedList => match key_event.code {
             KeyCode::Char('q') => {
@@ -52,6 +87,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             }
             KeyCode::Char('/') => {
                 app.start_search();
+            }
+            KeyCode::Char('p') => {
+                app.open_preview();
             }
             KeyCode::Char('m') => {
                 app.clear_search(); // Clear search when entering feed manager
@@ -258,6 +296,9 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             }
             KeyCode::Char('/') => {
                 app.start_search();
+            }
+            KeyCode::Char('p') => {
+                app.open_preview();
             }
             KeyCode::Char('o') => {
                 app.open_selected_feed();

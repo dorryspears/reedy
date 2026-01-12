@@ -63,6 +63,7 @@ pub enum InputMode {
     Searching,
     Importing,
     SettingCategory,
+    Preview,
 }
 
 #[derive(Debug, PartialEq)]
@@ -130,6 +131,8 @@ pub struct App {
     pub last_refresh: Option<SystemTime>,
     /// Flag indicating an auto-refresh is pending (set by tick, consumed by main loop)
     pub auto_refresh_pending: bool,
+    /// Scroll position for the article preview pane
+    pub preview_scroll: u16,
 }
 
 impl Default for App {
@@ -155,6 +158,7 @@ impl Default for App {
             config: Config::default(),
             last_refresh: None,
             auto_refresh_pending: false,
+            preview_scroll: 0,
         }
     }
 }
@@ -1164,6 +1168,54 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Opens the article preview pane for the currently selected item
+    pub fn open_preview(&mut self) {
+        if let Some(visible_index) = self.selected_index {
+            if self.get_actual_index(visible_index).is_some() {
+                self.input_mode = InputMode::Preview;
+                self.preview_scroll = 0;
+            }
+        }
+    }
+
+    /// Closes the article preview pane
+    pub fn close_preview(&mut self) {
+        self.input_mode = InputMode::Normal;
+        self.preview_scroll = 0;
+    }
+
+    /// Scrolls the preview pane up by one line
+    pub fn preview_scroll_up(&mut self) {
+        self.preview_scroll = self.preview_scroll.saturating_sub(1);
+    }
+
+    /// Scrolls the preview pane down by one line
+    pub fn preview_scroll_down(&mut self) {
+        self.preview_scroll = self.preview_scroll.saturating_add(1);
+    }
+
+    /// Scrolls the preview pane up by a page
+    pub fn preview_page_up(&mut self) {
+        let page_size = self.terminal_height.saturating_sub(10);
+        self.preview_scroll = self.preview_scroll.saturating_sub(page_size);
+    }
+
+    /// Scrolls the preview pane down by a page
+    pub fn preview_page_down(&mut self) {
+        let page_size = self.terminal_height.saturating_sub(10);
+        self.preview_scroll = self.preview_scroll.saturating_add(page_size);
+    }
+
+    /// Gets the currently selected feed item for preview
+    pub fn get_preview_item(&self) -> Option<&FeedItem> {
+        if let Some(visible_index) = self.selected_index {
+            if let Some(actual_index) = self.get_actual_index(visible_index) {
+                return self.current_feed_content.get(actual_index);
+            }
+        }
+        None
     }
 
     /// Starts search mode

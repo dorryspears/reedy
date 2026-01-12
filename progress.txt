@@ -596,3 +596,57 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)
 
+---
+
+### Implemented: Medium Priority Feature #9 - Article Preview Pane
+
+**Location:** `src/app.rs`, `src/handler.rs`, `src/ui.rs`
+
+**Description:** Added the ability to view full article content in a dedicated preview pane within the TUI. This allows users to read article content without leaving the terminal or opening a browser.
+
+**Implementation Details:**
+
+1. **New InputMode:** Added `InputMode::Preview` to handle the article preview state
+
+2. **New App field:**
+   - `preview_scroll: u16` - Tracks the scroll position within the preview pane
+
+3. **New App methods:**
+   - `open_preview()` - Opens the preview pane for the currently selected item
+   - `close_preview()` - Closes the preview pane and returns to normal mode
+   - `preview_scroll_up()` - Scrolls the preview content up by one line
+   - `preview_scroll_down()` - Scrolls the preview content down by one line
+   - `preview_page_up()` - Scrolls the preview content up by a page
+   - `preview_page_down()` - Scrolls the preview content down by a page
+   - `get_preview_item()` - Returns the currently selected feed item for preview
+
+4. **Key bindings:**
+   - `p` (in FeedList or Favorites) - Open article preview pane
+   - `↑/k` - Scroll preview up
+   - `↓/j` - Scroll preview down
+   - `PgUp` - Page up in preview
+   - `PgDn` - Page down in preview
+   - `g` - Scroll to top of preview
+   - `o` - Open article in browser (from preview)
+   - `r` - Toggle read status (from preview)
+   - `f` - Toggle favorite status (from preview)
+   - `Esc/q/p` - Close preview and return to feed list
+
+5. **UI Features:**
+   - Preview displays article title (styled in bold green)
+   - Shows feed name, publication date, and article link
+   - Displays read/favorite status
+   - Separator line between metadata and content
+   - Full article description with word wrapping
+   - Scroll position indicator when content overflows: "Article Preview (Line X/Y)"
+
+6. **New helper function:**
+   - `wrap_text()` - Wraps text to fit within a specified width for proper display
+
+**Files changed:**
+- `src/app.rs` - Added `InputMode::Preview`, `preview_scroll` field, and preview-related methods
+- `src/handler.rs` - Added preview mode key event handling and `p` key binding
+- `src/ui.rs` - Added `render_article_preview()` function, `wrap_text()` helper, updated command bars and help menus
+
+**Tests:** All tests pass (29 total: 24 app tests, 5 ui tests)
+

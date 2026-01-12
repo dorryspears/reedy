@@ -81,6 +81,8 @@ pub fn render(app: &App, frame: &mut Frame) {
     // If we're in help mode, render the help menu instead of the regular content
     if app.input_mode == InputMode::Help {
         render_help_menu(app, frame, chunks[1]);
+    } else if app.input_mode == InputMode::Preview {
+        render_article_preview(app, frame, chunks[1]);
     } else {
         match app.page_mode {
             PageMode::FeedList => render_feed_content(app, frame, chunks[1]),
@@ -345,6 +347,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(Color::Yellow),
             )]),
+            Line::from("p              - Open article preview pane"),
             Line::from("o              - Open selected item in browser"),
             Line::from("r              - Toggle read status of selected item"),
             Line::from("R              - Mark all items as read"),
@@ -422,6 +425,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(Color::Yellow),
             )]),
+            Line::from("p              - Open article preview pane"),
             Line::from("o              - Open selected item in browser"),
             Line::from("f              - Remove item from favorites"),
             Line::from("F              - Return to all feeds view"),
@@ -435,6 +439,179 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect) {
         .style(Style::default().fg(Color::White));
 
     frame.render_widget(help_paragraph, area);
+}
+
+/// Renders the article preview pane showing full article content
+fn render_article_preview(app: &App, frame: &mut Frame, area: Rect) {
+    let Some(item) = app.get_preview_item() else {
+        // Should not happen, but render empty if no item
+        let paragraph = Paragraph::new("No article selected")
+            .block(Block::default().title("Article Preview").borders(Borders::ALL))
+            .style(Style::default().fg(Color::Gray));
+        frame.render_widget(paragraph, area);
+        return;
+    };
+
+    // Parse the title to extract article title and feed name
+    let (article_title, feed_name) = if let Some(pos) = item.title.rfind(" | ") {
+        (&item.title[..pos], &item.title[pos + 3..])
+    } else {
+        (item.title.as_str(), "")
+    };
+
+    // Format the date
+    let date_str = item.published.map_or_else(
+        || "No date".to_string(),
+        |date| {
+            let datetime: DateTime<Local> = date.into();
+            datetime.format("%Y-%m-%d %H:%M").to_string()
+        },
+    );
+
+    // Build the content lines
+    let mut lines: Vec<Line> = Vec::new();
+
+    // Title section
+    lines.push(Line::from(vec![Span::styled(
+        article_title,
+        Style::default()
+            .add_modifier(Modifier::BOLD)
+            .fg(Color::Green),
+    )]));
+    lines.push(Line::from(""));
+
+    // Metadata section
+    if !feed_name.is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled("Feed: ", Style::default().fg(Color::Yellow)),
+            Span::styled(feed_name, Style::default().fg(Color::White)),
+        ]));
+    }
+
+    lines.push(Line::from(vec![
+        Span::styled("Date: ", Style::default().fg(Color::Yellow)),
+        Span::styled(date_str, Style::default().fg(Color::White)),
+    ]));
+
+    if !item.link.is_empty() {
+        lines.push(Line::from(vec![
+            Span::styled("Link: ", Style::default().fg(Color::Yellow)),
+            Span::styled(&item.link, Style::default().fg(Color::Cyan)),
+        ]));
+    }
+
+    // Read/Favorite status
+    let status = format!(
+        "Status: {}{}",
+        if app.is_item_read(item) { "[Read] " } else { "[Unread] " },
+        if app.is_item_favorite(item) { "★ Favorite" } else { "" }
+    );
+    lines.push(Line::from(vec![Span::styled(
+        status,
+        Style::default().fg(Color::Gray),
+    )]));
+
+    // Separator
+    lines.push(Line::from(""));
+    lines.push(Line::from(vec![Span::styled(
+        "─".repeat(area.width.saturating_sub(4) as usize),
+        Style::default().fg(Color::DarkGray),
+    )]));
+    lines.push(Line::from(""));
+
+    // Content section - wrap the description text
+    let content_width = area.width.saturating_sub(4) as usize;
+    for line in item.description.lines() {
+        // Word wrap each line
+        let wrapped = wrap_text(line, content_width);
+        for wrapped_line in wrapped {
+            lines.push(Line::from(wrapped_line));
+        }
+    }
+
+    // Calculate total lines and visible area height
+    let total_lines = lines.len();
+    let visible_height = area.height.saturating_sub(2) as usize; // Account for borders
+
+    // Clamp scroll to prevent scrolling past content
+    let max_scroll = total_lines.saturating_sub(visible_height);
+    let scroll = (app.preview_scroll as usize).min(max_scroll);
+
+    // Build the title with scroll indicator
+    let title = if total_lines > visible_height {
+        format!(
+            "Article Preview (Line {}/{})",
+            scroll + 1,
+            total_lines
+        )
+    } else {
+        "Article Preview".to_string()
+    };
+
+    let paragraph = Paragraph::new(lines)
+        .block(Block::default().title(title).borders(Borders::ALL))
+        .style(Style::default().fg(Color::White))
+        .scroll((scroll as u16, 0));
+
+    frame.render_widget(paragraph, area);
+}
+
+/// Wraps text to fit within a specified width
+fn wrap_text(text: &str, max_width: usize) -> Vec<String> {
+    if max_width == 0 {
+        return vec![];
+    }
+    if text.is_empty() {
+        return vec![String::new()];
+    }
+
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+
+    for word in text.split_whitespace() {
+        if current_line.is_empty() {
+            // First word on line
+            if word.len() > max_width {
+                // Word is longer than max width, force break it
+                let mut remaining = word;
+                while remaining.len() > max_width {
+                    lines.push(remaining[..max_width].to_string());
+                    remaining = &remaining[max_width..];
+                }
+                current_line = remaining.to_string();
+            } else {
+                current_line = word.to_string();
+            }
+        } else if current_line.len() + 1 + word.len() <= max_width {
+            // Word fits on current line
+            current_line.push(' ');
+            current_line.push_str(word);
+        } else {
+            // Word doesn't fit, start new line
+            lines.push(current_line);
+            if word.len() > max_width {
+                // Word is longer than max width, force break it
+                let mut remaining = word;
+                while remaining.len() > max_width {
+                    lines.push(remaining[..max_width].to_string());
+                    remaining = &remaining[max_width..];
+                }
+                current_line = remaining.to_string();
+            } else {
+                current_line = word.to_string();
+            }
+        }
+    }
+
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    if lines.is_empty() {
+        lines.push(String::new());
+    }
+
+    lines
 }
 
 /// Truncates text to fit within a specified width, adding ellipsis if necessary
@@ -458,6 +635,8 @@ pub fn truncate_text(text: &str, max_width: u16) -> String {
 fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
     let commands = if app.input_mode == InputMode::Help {
         "[q/Esc/?] Exit Help".to_string()
+    } else if app.input_mode == InputMode::Preview {
+        "[↑↓/jk] Scroll  [PgUp/PgDn] Page  [o] Open in Browser  [r] Toggle Read  [f] Toggle Favorite  [Esc/q/p] Close".to_string()
     } else if app.input_mode == InputMode::Searching {
         format!("Search: {}█  [Enter] Confirm  [Esc] Cancel", app.search_query)
     } else {
@@ -466,18 +645,18 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
                 if app.current_feed_content.is_empty() {
                     "[m] Manage Feeds  [c] Refresh Cache  [F] Favorites  [?] Help  [q] Quit".to_string()
                 } else if app.filtered_indices.is_some() {
-                    "[↑↓] Navigate  [/] Search  [Esc] Clear Filter  [o] Open  [f] Favorite  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [/] Search  [Esc] Clear Filter  [p] Preview  [o] Open  [f] Favorite  [?] Help  [q] Quit".to_string()
                 } else {
-                    "[↑↓] Navigate  [/] Search  [o] Open  [m] Manage  [c] Refresh  [r] Read  [f] Favorite  [F] Favorites  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [/] Search  [p] Preview  [o] Open  [m] Manage  [c] Refresh  [r] Read  [f] Favorite  [F] Favorites  [?] Help  [q] Quit".to_string()
                 }
             }
             PageMode::Favorites => {
                 if app.current_feed_content.is_empty() {
                     "[F] Back to Feeds  [?] Help  [q] Quit".to_string()
                 } else if app.filtered_indices.is_some() {
-                    "[↑↓] Navigate  [/] Search  [Esc] Clear Filter  [o] Open  [f] Favorite  [F] Back  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [/] Search  [Esc] Clear Filter  [p] Preview  [o] Open  [f] Favorite  [F] Back  [?] Help  [q] Quit".to_string()
                 } else {
-                    "[↑↓] Navigate  [/] Search  [o] Open  [f] Favorite  [F] Back to Feeds  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [/] Search  [p] Preview  [o] Open  [f] Favorite  [F] Back to Feeds  [?] Help  [q] Quit".to_string()
                 }
             }
             PageMode::FeedManager => match app.input_mode {
@@ -496,7 +675,7 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect) {
                     format!("Set category: {}█  [Enter] Save  [Esc] Cancel  (empty to remove)", app.input_buffer)
                 }
                 InputMode::FeedManager => "[m] Back to Feeds  [?] Help".to_string(),
-                InputMode::Help | InputMode::Searching => unreachable!(), // These cases are already handled above
+                InputMode::Help | InputMode::Searching | InputMode::Preview => unreachable!(), // These cases are already handled above
             },
         }
     };
