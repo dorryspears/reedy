@@ -190,9 +190,16 @@ https://news.site.com/atom.xml
 - Unread counts are highlighted in cyan when there are unread items
 - Uses `#[serde(default)]` for backwards compatibility with existing cached feed data
 
-#### 6. Configurable HTTP Timeout
+#### ~~6. Configurable HTTP Timeout~~ DONE
 **Description:** Add configuration for request timeouts to prevent hangs.
 **Value:** Prevents application from becoming unresponsive.
+
+**Implementation:**
+- Added `Config` struct with `http_timeout_secs` field (default: 30 seconds)
+- Configuration stored in `~/.config/reedy/config.json`
+- Config is loaded on startup and used for all HTTP requests
+- If config file doesn't exist, default values are used
+- `fetch_feed()` public API accepts optional timeout parameter for flexibility
 
 ---
 

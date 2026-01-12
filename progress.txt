@@ -378,3 +378,55 @@ This pattern is inefficient and can cause deadlocks in certain scenarios because
 - `tests/app_tests.rs` - Updated all test FeedItem creations to include `feed_url` field
 
 **Tests:** All tests pass (23 total: 18 app tests, 5 ui tests)
+
+---
+
+### Implemented: High Priority Feature #6 - Configurable HTTP Timeout
+
+**Location:** `src/app.rs`
+
+**Description:** Added a configuration system that allows users to customize the HTTP request timeout. This prevents the application from hanging indefinitely when connecting to slow or unresponsive feed servers.
+
+**Implementation Details:**
+
+1. **New Config struct:** Added `Config` struct with `http_timeout_secs` field:
+   ```rust
+   pub struct Config {
+       pub http_timeout_secs: u64, // default: 30
+   }
+   ```
+
+2. **Configuration file:** Config is stored at `~/.config/reedy/config.json` alongside the existing `feeds.json`
+
+3. **New App methods:**
+   - `get_config_path()` - Returns the path to config.json
+   - `load_config()` - Loads config from file or returns defaults if not found
+   - `save_config()` - Saves current config to file
+
+4. **Updated HTTP client creation:** Modified `create_http_client()` to accept timeout as parameter instead of using a constant
+
+5. **Updated all HTTP request call sites:**
+   - `validate_and_get_feed_title()` - Now takes timeout parameter
+   - `load_feed_content()` - Uses `self.config.http_timeout_secs`
+   - `cache_all_feeds()` - Uses `self.config.http_timeout_secs`
+   - `refresh_all_feeds()` - Uses `self.config.http_timeout_secs`
+   - `fetch_feed()` - Public API now accepts optional timeout parameter
+
+6. **Config persistence:** Config is loaded at app startup and stored in the App struct
+
+7. **Backwards compatibility:**
+   - If config.json doesn't exist, default values are used
+   - The `#[serde(default)]` attribute ensures missing fields use defaults
+   - `fetch_feed()` accepts `Option<u64>` for timeout, using default if None
+
+**Example config.json:**
+```json
+{
+  "http_timeout_secs": 30
+}
+```
+
+**Files changed:**
+- `src/app.rs` - Added `Config` struct, config methods, `config` field to `App`, updated all HTTP client calls
+
+**Tests:** All tests pass (23 total: 18 app tests, 5 ui tests)

@@ -10,12 +10,32 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, error, fs, path::PathBuf, time::Duration, time::SystemTime};
 
 /// Default HTTP request timeout in seconds
-const HTTP_TIMEOUT_SECS: u64 = 30;
+const DEFAULT_HTTP_TIMEOUT_SECS: u64 = 30;
+
+/// Application configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    /// HTTP request timeout in seconds (default: 30)
+    #[serde(default = "default_http_timeout")]
+    pub http_timeout_secs: u64,
+}
+
+fn default_http_timeout() -> u64 {
+    DEFAULT_HTTP_TIMEOUT_SECS
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            http_timeout_secs: DEFAULT_HTTP_TIMEOUT_SECS,
+        }
+    }
+}
 
 /// Creates a reqwest client with a configured timeout to prevent hanging on slow/unresponsive feeds
-fn create_http_client() -> reqwest::Client {
+fn create_http_client(timeout_secs: u64) -> reqwest::Client {
     reqwest::Client::builder()
-        .timeout(Duration::from_secs(HTTP_TIMEOUT_SECS))
+        .timeout(Duration::from_secs(timeout_secs))
         .build()
         .unwrap_or_else(|_| reqwest::Client::new())
 }
@@ -91,6 +111,7 @@ pub struct App {
     pub search_query: String,
     pub filtered_indices: Option<Vec<usize>>,
     pub import_result: Option<String>,
+    pub config: Config,
 }
 
 impl Default for App {
@@ -113,13 +134,17 @@ impl Default for App {
             search_query: String::new(),
             filtered_indices: None,
             import_result: None,
+            config: Config::default(),
         }
     }
 }
 
 impl App {
     pub async fn new() -> Self {
-        let mut app = Self::default();
+        let mut app = Self {
+            config: Self::load_config(),
+            ..Default::default()
+        };
 
         // Get initial terminal size
         if let Ok((width, height)) = terminal::size() {
@@ -176,6 +201,34 @@ impl App {
         fs::create_dir_all(&path).unwrap_or_default();
         path.push("reedy.log");
         path
+    }
+
+    pub fn get_config_path() -> PathBuf {
+        let mut path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
+        path.push("reedy");
+        fs::create_dir_all(&path).unwrap_or_default();
+        path.push("config.json");
+        path
+    }
+
+    pub fn load_config() -> Config {
+        let config_path = Self::get_config_path();
+        if config_path.exists() {
+            if let Ok(contents) = fs::read_to_string(&config_path) {
+                if let Ok(config) = serde_json::from_str::<Config>(&contents) {
+                    return config;
+                }
+            }
+        }
+        // Return default config if file doesn't exist or can't be parsed
+        Config::default()
+    }
+
+    pub fn save_config(&self) -> AppResult<()> {
+        let config_path = Self::get_config_path();
+        let json = serde_json::to_string_pretty(&self.config)?;
+        fs::write(config_path, json)?;
+        Ok(())
     }
 
     fn create_item_id(title: &str, published: Option<SystemTime>) -> String {
@@ -535,7 +588,7 @@ impl App {
             }
 
             // Validate the URL and get title
-            match Self::validate_and_get_feed_title(&url).await {
+            match Self::validate_and_get_feed_title(&url, self.config.http_timeout_secs).await {
                 Ok(Some(title)) => {
                     info!("Successfully validated and added feed: {} ({})", title, url);
                     self.rss_feeds.push(FeedInfo { url, title });
@@ -581,7 +634,10 @@ impl App {
 
     /// Validates a URL as a valid RSS/Atom feed and returns its title if valid.
     /// Returns Ok(Some(title)) if valid, Ok(None) if invalid, or Err on failure.
-    pub async fn validate_and_get_feed_title(url: &str) -> AppResult<Option<String>> {
+    pub async fn validate_and_get_feed_title(
+        url: &str,
+        timeout_secs: u64,
+    ) -> AppResult<Option<String>> {
         // First validate URL format
         let url = reqwest::Url::parse(url)?;
         if url.scheme() != "http" && url.scheme() != "https" {
@@ -589,7 +645,7 @@ impl App {
         }
 
         // Try to fetch and parse the feed
-        let client = create_http_client();
+        let client = create_http_client(timeout_secs);
         match client.get(url.as_str()).send().await {
             Ok(response) => {
                 let bytes = response.bytes().await?;
@@ -619,7 +675,9 @@ impl App {
 
     pub async fn add_feed(&mut self) -> AppResult<()> {
         debug!("Attempting to add feed: {}", self.input_buffer);
-        match Self::validate_and_get_feed_title(&self.input_buffer).await {
+        match Self::validate_and_get_feed_title(&self.input_buffer, self.config.http_timeout_secs)
+            .await
+        {
             Ok(Some(title)) => {
                 info!("Successfully validated feed: {} ({})", title, self.input_buffer);
                 self.rss_feeds.push(FeedInfo {
@@ -668,7 +726,7 @@ impl App {
                 }
 
                 debug!("Fetching feed content from URL: {}", url);
-                let client = create_http_client();
+                let client = create_http_client(self.config.http_timeout_secs);
                 let response = client.get(url.as_str()).send().await?;
                 let content = response.bytes().await?;
 
@@ -1074,7 +1132,7 @@ impl App {
             }
 
             debug!("Fetching feed content from URL: {}", feed_info.url);
-            let client = create_http_client();
+            let client = create_http_client(self.config.http_timeout_secs);
             match client.get(&feed_info.url).send().await {
                 Ok(response) => {
                     if let Ok(content) = response.bytes().await {
@@ -1123,7 +1181,7 @@ impl App {
     pub async fn refresh_all_feeds(&mut self) -> AppResult<()> {
         let mut all_items = Vec::new();
 
-        let client = create_http_client();
+        let client = create_http_client(self.config.http_timeout_secs);
         for feed_info in &self.rss_feeds {
             debug!("Refreshing feed: {}", feed_info.url);
             match client.get(&feed_info.url).send().await {
@@ -1299,9 +1357,9 @@ impl App {
     }
 }
 
-pub async fn fetch_feed(url: &str) -> AppResult<Vec<FeedItem>> {
+pub async fn fetch_feed(url: &str, timeout_secs: Option<u64>) -> AppResult<Vec<FeedItem>> {
     debug!("Fetching feed from URL: {}", url);
-    let client = create_http_client();
+    let client = create_http_client(timeout_secs.unwrap_or(DEFAULT_HTTP_TIMEOUT_SECS));
     let response = client.get(url).send().await?.bytes().await?;
 
     // Try parsing as RSS first
