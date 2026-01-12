@@ -213,7 +213,7 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
         .rss_feeds
         .iter()
         .enumerate()
-        .map(|(i, url)| {
+        .map(|(i, feed_info)| {
             let style = if Some(i) == app.selected_index {
                 Style::default()
                     .fg(Color::Yellow)
@@ -222,13 +222,13 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect) {
                 Style::default().fg(Color::White)
             };
 
-            // Calculate max width for URL
-            let url_max_width = chunks[0].width.saturating_sub(8) as usize; // Account for index and spacing
-            let truncated_url = truncate_text(url, url_max_width as u16);
+            // Calculate max width for title
+            let title_max_width = chunks[0].width.saturating_sub(8) as usize; // Account for index and spacing
+            let truncated_title = truncate_text(&feed_info.title, title_max_width as u16);
 
             ListItem::new(Line::from(vec![
                 Span::raw(format!("{}. ", i + 1)),
-                Span::raw(truncated_url),
+                Span::raw(truncated_title),
             ]))
             .style(style)
         })

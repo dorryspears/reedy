@@ -49,9 +49,16 @@ pub struct FeedItem {
     pub id: String,
 }
 
+/// Represents a feed subscription with its URL and title
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FeedInfo {
+    pub url: String,
+    pub title: String,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 struct SavedState {
-    feeds: Vec<String>,
+    feeds: Vec<FeedInfo>,
     read_items: HashSet<String>,
     favorites: HashSet<String>,
 }
@@ -69,7 +76,7 @@ pub struct App {
     pub input_mode: InputMode,
     pub page_mode: PageMode,
     pub input_buffer: String,
-    pub rss_feeds: Vec<String>,
+    pub rss_feeds: Vec<FeedInfo>,
     pub selected_index: Option<usize>,
     pub current_feed_content: Vec<FeedItem>,
     pub error_message: Option<String>,
@@ -131,8 +138,8 @@ impl App {
 
             // Load and combine all cached feed content
             let mut all_items = Vec::new();
-            for url in &app.rss_feeds {
-                if let Some(cached_items) = app.load_feed_cache(url) {
+            for feed in &app.rss_feeds {
+                if let Some(cached_items) = app.load_feed_cache(&feed.url) {
                     all_items.extend(cached_items);
                 }
             }
@@ -232,7 +239,7 @@ impl App {
         if self.save_path.exists() {
             let content = fs::read_to_string(&self.save_path)?;
 
-            // Try to parse with new format first
+            // Try to parse with new format first (Vec<FeedInfo>)
             match serde_json::from_str::<SavedState>(&content) {
                 Ok(saved) => {
                     self.rss_feeds = saved.feeds;
@@ -246,22 +253,57 @@ impl App {
                     );
                 }
                 Err(_) => {
-                    // Try parsing old format (without favorites)
+                    // Try parsing middle format (with favorites, but Vec<String> for feeds)
                     #[derive(Debug, Serialize, Deserialize)]
-                    struct OldSavedState {
+                    struct MiddleSavedState {
                         feeds: Vec<String>,
                         read_items: HashSet<String>,
+                        favorites: HashSet<String>,
                     }
 
-                    if let Ok(old_saved) = serde_json::from_str::<OldSavedState>(&content) {
-                        self.rss_feeds = old_saved.feeds;
-                        self.read_items = old_saved.read_items;
-                        self.favorites = HashSet::new(); // Initialize empty favorites
+                    if let Ok(middle_saved) = serde_json::from_str::<MiddleSavedState>(&content) {
+                        // Convert Vec<String> to Vec<FeedInfo> using URL as title
+                        self.rss_feeds = middle_saved
+                            .feeds
+                            .into_iter()
+                            .map(|url| FeedInfo {
+                                title: url.clone(),
+                                url,
+                            })
+                            .collect();
+                        self.read_items = middle_saved.read_items;
+                        self.favorites = middle_saved.favorites;
                         debug!(
-                            "Loaded {} feeds from old format state file {}",
+                            "Loaded {} feeds from middle format state file {}",
                             self.rss_feeds.len(),
                             self.save_path.display()
                         );
+                    } else {
+                        // Try parsing oldest format (without favorites)
+                        #[derive(Debug, Serialize, Deserialize)]
+                        struct OldSavedState {
+                            feeds: Vec<String>,
+                            read_items: HashSet<String>,
+                        }
+
+                        if let Ok(old_saved) = serde_json::from_str::<OldSavedState>(&content) {
+                            // Convert Vec<String> to Vec<FeedInfo> using URL as title
+                            self.rss_feeds = old_saved
+                                .feeds
+                                .into_iter()
+                                .map(|url| FeedInfo {
+                                    title: url.clone(),
+                                    url,
+                                })
+                                .collect();
+                            self.read_items = old_saved.read_items;
+                            self.favorites = HashSet::new(); // Initialize empty favorites
+                            debug!(
+                                "Loaded {} feeds from old format state file {}",
+                                self.rss_feeds.len(),
+                                self.save_path.display()
+                            );
+                        }
                     }
                 }
             }
@@ -399,7 +441,12 @@ impl App {
             return;
         }
 
-        let feed_list = self.rss_feeds.join("\n");
+        let feed_list: String = self
+            .rss_feeds
+            .iter()
+            .map(|f| f.url.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
         match arboard::Clipboard::new() {
             Ok(mut clipboard) => match clipboard.set_text(&feed_list) {
                 Ok(()) => {
@@ -460,19 +507,19 @@ impl App {
 
         for url in urls {
             // Skip duplicates
-            if self.rss_feeds.contains(&url) {
+            if self.rss_feeds.iter().any(|f| f.url == url) {
                 skipped_duplicate += 1;
                 continue;
             }
 
-            // Validate the URL
-            match Self::is_valid_rss_feed(&url).await {
-                Ok(true) => {
-                    info!("Successfully validated and added feed: {}", url);
-                    self.rss_feeds.push(url);
+            // Validate the URL and get title
+            match Self::validate_and_get_feed_title(&url).await {
+                Ok(Some(title)) => {
+                    info!("Successfully validated and added feed: {} ({})", title, url);
+                    self.rss_feeds.push(FeedInfo { url, title });
                     added += 1;
                 }
-                Ok(false) => {
+                Ok(None) => {
                     debug!("Invalid RSS feed URL during import: {}", url);
                     skipped_invalid += 1;
                 }
@@ -510,11 +557,13 @@ impl App {
         Ok(())
     }
 
-    pub async fn is_valid_rss_feed(url: &str) -> AppResult<bool> {
+    /// Validates a URL as a valid RSS/Atom feed and returns its title if valid.
+    /// Returns Ok(Some(title)) if valid, Ok(None) if invalid, or Err on failure.
+    pub async fn validate_and_get_feed_title(url: &str) -> AppResult<Option<String>> {
         // First validate URL format
         let url = reqwest::Url::parse(url)?;
         if url.scheme() != "http" && url.scheme() != "https" {
-            return Ok(false);
+            return Ok(None);
         }
 
         // Try to fetch and parse the feed
@@ -523,31 +572,44 @@ impl App {
             Ok(response) => {
                 let bytes = response.bytes().await?;
                 // Try RSS first
-                if Channel::read_from(&bytes[..]).is_ok() {
-                    return Ok(true);
+                if let Ok(channel) = Channel::read_from(&bytes[..]) {
+                    let title = channel.title().to_string();
+                    return Ok(Some(if title.is_empty() {
+                        url.to_string()
+                    } else {
+                        title
+                    }));
                 }
                 // Try Atom if RSS fails
-                if AtomFeed::read_from(&bytes[..]).is_ok() {
-                    return Ok(true);
+                if let Ok(feed) = AtomFeed::read_from(&bytes[..]) {
+                    let title = feed.title().value.clone();
+                    return Ok(Some(if title.is_empty() {
+                        url.to_string()
+                    } else {
+                        title
+                    }));
                 }
-                Ok(false)
+                Ok(None)
             }
-            Err(_) => Ok(false),
+            Err(_) => Ok(None),
         }
     }
 
     pub async fn add_feed(&mut self) -> AppResult<()> {
         debug!("Attempting to add feed: {}", self.input_buffer);
-        match Self::is_valid_rss_feed(&self.input_buffer).await {
-            Ok(true) => {
-                info!("Successfully validated feed: {}", self.input_buffer);
-                self.rss_feeds.push(self.input_buffer.clone());
+        match Self::validate_and_get_feed_title(&self.input_buffer).await {
+            Ok(Some(title)) => {
+                info!("Successfully validated feed: {} ({})", title, self.input_buffer);
+                self.rss_feeds.push(FeedInfo {
+                    url: self.input_buffer.clone(),
+                    title,
+                });
                 self.save_feeds()?;
                 self.input_buffer.clear();
                 self.input_mode = InputMode::Normal;
                 Ok(())
             }
-            Ok(false) => {
+            Ok(None) => {
                 error!("Invalid RSS feed URL: {}", self.input_buffer);
                 self.error_message = Some("Invalid RSS feed URL".to_string());
                 Ok(())
@@ -571,7 +633,9 @@ impl App {
 
     pub async fn load_feed_content(&mut self) -> AppResult<()> {
         if let Some(index) = self.selected_index {
-            if let Some(url) = self.rss_feeds.get(index) {
+            if let Some(feed_info) = self.rss_feeds.get(index) {
+                let url = &feed_info.url;
+                let feed_title = &feed_info.title;
                 debug!("Checking cache for URL: {}", url);
 
                 // Try to load from cache first
@@ -583,9 +647,10 @@ impl App {
 
                 debug!("Fetching feed content from URL: {}", url);
                 let client = create_http_client();
-                let response = client.get(url).send().await?;
+                let response = client.get(url.as_str()).send().await?;
                 let content = response.bytes().await?;
 
+                let feed_title_clone = feed_title.clone();
                 let mut feed_items: Vec<FeedItem> = match Channel::read_from(&content[..]) {
                     Ok(channel) => {
                         // Handle RSS feed
@@ -608,7 +673,7 @@ impl App {
                                     title: format!(
                                         "{} | {}",
                                         item.title().unwrap_or("No title"),
-                                        url
+                                        feed_title_clone
                                     ),
                                     description: clean_description,
                                     link: item.link().unwrap_or("").to_string(),
@@ -642,7 +707,7 @@ impl App {
                                         .map(|date| date.to_owned().into());
 
                                     FeedItem {
-                                        title: format!("{} | {}", entry.title().value, url),
+                                        title: format!("{} | {}", entry.title().value, feed_title_clone),
                                         description: clean_description,
                                         link: entry
                                             .links()
@@ -975,27 +1040,27 @@ impl App {
     /// - Feed parsing fails
     /// - Cache operations fail
     pub async fn cache_all_feeds(&mut self) {
-        for url in self.rss_feeds.clone() {
-            debug!("Checking cache for URL: {}", url);
+        for feed_info in self.rss_feeds.clone() {
+            debug!("Checking cache for URL: {}", feed_info.url);
 
             // Skip if already cached
-            if self.load_feed_cache(&url).is_some() {
-                debug!("Using existing cache for {}", url);
+            if self.load_feed_cache(&feed_info.url).is_some() {
+                debug!("Using existing cache for {}", feed_info.url);
                 continue;
             }
 
-            debug!("Fetching feed content from URL: {}", url);
+            debug!("Fetching feed content from URL: {}", feed_info.url);
             let client = create_http_client();
-            match client.get(&url).send().await {
+            match client.get(&feed_info.url).send().await {
                 Ok(response) => {
                     if let Ok(content) = response.bytes().await {
                         // Try RSS first
                         let feed_items = match Channel::read_from(&content[..]) {
-                            Ok(channel) => convert_rss_items(channel, &url),
+                            Ok(channel) => convert_rss_items(channel, &feed_info.title),
                             Err(_) => {
                                 // Try Atom if RSS fails
                                 match AtomFeed::read_from(&content[..]) {
-                                    Ok(feed) => convert_atom_items(feed, &url),
+                                    Ok(feed) => convert_atom_items(feed, &feed_info.title),
                                     Err(e) => {
                                         error!("Failed to parse feed as either RSS or Atom: {}", e);
                                         continue;
@@ -1004,13 +1069,13 @@ impl App {
                             }
                         };
 
-                        if let Err(e) = self.save_feed_cache(&url, &feed_items) {
-                            error!("Failed to cache feed content for {}: {}", url, e);
+                        if let Err(e) = self.save_feed_cache(&feed_info.url, &feed_items) {
+                            error!("Failed to cache feed content for {}: {}", feed_info.url, e);
                         }
                     }
                 }
                 Err(e) => {
-                    error!("Failed to fetch feed {}: {}", url, e);
+                    error!("Failed to fetch feed {}: {}", feed_info.url, e);
                 }
             }
         }
@@ -1035,33 +1100,33 @@ impl App {
         let mut all_items = Vec::new();
 
         let client = create_http_client();
-        for url in &self.rss_feeds {
-            debug!("Refreshing feed: {}", url);
-            match client.get(url).send().await {
+        for feed_info in &self.rss_feeds {
+            debug!("Refreshing feed: {}", feed_info.url);
+            match client.get(&feed_info.url).send().await {
                 Ok(response) => {
                     let content = response.bytes().await?;
                     // Try RSS first
                     let feed_items = match Channel::read_from(&content[..]) {
-                        Ok(channel) => convert_rss_items(channel, url),
+                        Ok(channel) => convert_rss_items(channel, &feed_info.title),
                         Err(_) => {
                             // Try Atom if RSS fails
                             match AtomFeed::read_from(&content[..]) {
-                                Ok(feed) => convert_atom_items(feed, url),
+                                Ok(feed) => convert_atom_items(feed, &feed_info.title),
                                 Err(_e) => {
-                                    error!("Failed to parse feed as either RSS or Atom: {}", url);
+                                    error!("Failed to parse feed as either RSS or Atom: {}", feed_info.url);
                                     continue;
                                 }
                             }
                         }
                     };
                     // Save to cache
-                    if let Err(e) = self.save_feed_cache(url, &feed_items) {
-                        error!("Failed to cache feed content for {}: {}", url, e);
+                    if let Err(e) = self.save_feed_cache(&feed_info.url, &feed_items) {
+                        error!("Failed to cache feed content for {}: {}", feed_info.url, e);
                     }
                     all_items.extend(feed_items);
                 }
                 Err(e) => {
-                    error!("Failed to fetch feed {}: {}", url, e);
+                    error!("Failed to fetch feed {}: {}", feed_info.url, e);
                 }
             }
         }
@@ -1176,8 +1241,8 @@ impl App {
 
                 // Load and combine all cached feed content
                 let mut all_items = Vec::new();
-                for url in &self.rss_feeds {
-                    if let Some(cached_items) = self.load_feed_cache(url) {
+                for feed_info in &self.rss_feeds {
+                    if let Some(cached_items) = self.load_feed_cache(&feed_info.url) {
                         all_items.extend(cached_items);
                     }
                 }
@@ -1238,7 +1303,7 @@ pub async fn fetch_feed(url: &str) -> AppResult<Vec<FeedItem>> {
     }
 }
 
-fn convert_rss_items(channel: Channel, feed_url: &str) -> Vec<FeedItem> {
+fn convert_rss_items(channel: Channel, feed_title: &str) -> Vec<FeedItem> {
     channel
         .items()
         .iter()
@@ -1254,7 +1319,7 @@ fn convert_rss_items(channel: Channel, feed_url: &str) -> Vec<FeedItem> {
                 .and_then(|date| DateTime::parse_from_rfc2822(date).ok().map(|dt| dt.into()));
 
             FeedItem {
-                title: format!("{} | {}", item.title().unwrap_or("No title"), feed_url),
+                title: format!("{} | {}", item.title().unwrap_or("No title"), feed_title),
                 description: clean_description,
                 link: item.link().unwrap_or("").to_string(),
                 published,
@@ -1264,7 +1329,7 @@ fn convert_rss_items(channel: Channel, feed_url: &str) -> Vec<FeedItem> {
         .collect()
 }
 
-fn convert_atom_items(feed: AtomFeed, feed_url: &str) -> Vec<FeedItem> {
+fn convert_atom_items(feed: AtomFeed, feed_title: &str) -> Vec<FeedItem> {
     feed.entries()
         .iter()
         .map(|entry| {
@@ -1281,7 +1346,7 @@ fn convert_atom_items(feed: AtomFeed, feed_url: &str) -> Vec<FeedItem> {
                 .map(|date| date.to_owned().into());
 
             FeedItem {
-                title: format!("{} | {}", entry.title().value, feed_url),
+                title: format!("{} | {}", entry.title().value, feed_title),
                 description: clean_description,
                 link: entry
                     .links()

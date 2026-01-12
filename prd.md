@@ -168,9 +168,16 @@ https://news.site.com/atom.xml
 **Description:** Support importing and exporting feed lists in OPML format (industry standard).
 **Value:** Compatibility with other RSS readers for migration.
 
-#### 4. Feed Title Display
+#### ~~4. Feed Title Display~~ DONE
 **Description:** Extract and display the actual feed title instead of showing the URL.
 **Value:** Much better UX; users can identify feeds at a glance.
+
+**Implementation:**
+- Added `FeedInfo` struct with `url` and `title` fields to store feed subscriptions
+- When adding a feed (via manual entry or import), the feed title is extracted from the RSS/Atom `<title>` element
+- Feed Manager now displays feed titles instead of raw URLs
+- Feed items in the list view show "Item Title | Feed Title" instead of "Item Title | URL"
+- Backwards compatible: migrates old saved state files that only stored URLs (uses URL as title initially)
 
 #### 5. Unread Count per Feed
 **Description:** Show the number of unread items for each feed in the feed manager.

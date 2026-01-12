@@ -294,3 +294,52 @@ This pattern is inefficient and can cause deadlocks in certain scenarios because
 - `tests/app_tests.rs` - Added 3 new tests for import functionality
 
 **Tests:** All tests pass (23 total: 18 app tests, 5 ui tests)
+
+---
+
+### Implemented: High Priority Feature #4 - Feed Title Display
+
+**Location:** `src/app.rs`, `src/ui.rs`
+
+**Description:** Extract and display the actual feed title instead of showing the raw URL. This provides much better UX as users can identify feeds at a glance.
+
+**Implementation Details:**
+
+1. **New Data Structure:** Added `FeedInfo` struct with `url` and `title` fields to store feed subscriptions:
+   ```rust
+   pub struct FeedInfo {
+       pub url: String,
+       pub title: String,
+   }
+   ```
+
+2. **Changed `rss_feeds` type:** From `Vec<String>` to `Vec<FeedInfo>`
+
+3. **Updated `SavedState`:** Now persists `Vec<FeedInfo>` instead of `Vec<String>`
+
+4. **New validation function:** Renamed `is_valid_rss_feed()` to `validate_and_get_feed_title()` which returns `Option<String>` containing the feed title on success
+
+5. **Title extraction:** When adding a feed (manually or via import), the feed title is extracted from:
+   - RSS: `channel.title()`
+   - Atom: `feed.title().value`
+   - Falls back to URL if title is empty
+
+6. **Backwards compatibility:** Added migration logic in `load_feeds()` to handle:
+   - New format: `Vec<FeedInfo>` with titles
+   - Middle format: `Vec<String>` with favorites
+   - Old format: `Vec<String>` without favorites
+   - Old formats are converted by using the URL as the initial title
+
+7. **UI updates:**
+   - Feed Manager now displays feed titles instead of raw URLs
+   - Feed items show "Item Title | Feed Title" instead of "Item Title | URL"
+
+8. **Updated helper functions:**
+   - `convert_rss_items()` and `convert_atom_items()` now take `feed_title` parameter
+   - All methods iterating over `rss_feeds` updated to use `FeedInfo` fields
+
+**Files changed:**
+- `src/app.rs` - Added `FeedInfo` struct, updated `SavedState`, `App`, validation, add/import functions, and all feed iteration code
+- `src/ui.rs` - Updated `render_feed_manager()` to display feed titles
+
+**Tests:** All tests pass (23 total: 18 app tests, 5 ui tests)
