@@ -139,6 +139,11 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
         } else if key_matches(&key_event, &kb.scroll_to_bottom) {
             // Set to max value; the UI will cap it to actual content length
             app.preview_scroll = u16::MAX;
+        } else if key_matches(&key_event, &kb.export_article) {
+            // Export to clipboard with 's', export to file with 'S'
+            app.export_article_to_clipboard();
+        } else if key_event.code == KeyCode::Char('S') {
+            app.export_article_to_file();
         }
         return Ok(());
     }
@@ -203,6 +208,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             } else if key_matches(&key_event, &kb.toggle_favorites_view) {
                 app.clear_search(); // Clear search when toggling favorites
                 app.toggle_favorites_page().await;
+            } else if key_matches(&key_event, &kb.export_article) {
+                app.export_article_to_clipboard();
+            } else if key_event.code == KeyCode::Char('S') {
+                app.export_article_to_file();
             } else if key_matches(&key_event, &kb.help) {
                 app.toggle_help();
             }
@@ -379,6 +388,10 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 app.scroll_to_top();
             } else if key_matches(&key_event, &kb.scroll_to_bottom) {
                 app.scroll_to_bottom();
+            } else if key_matches(&key_event, &kb.export_article) {
+                app.export_article_to_clipboard();
+            } else if key_event.code == KeyCode::Char('S') {
+                app.export_article_to_file();
             } else if key_matches(&key_event, &kb.help) {
                 app.toggle_help();
             }

@@ -180,6 +180,10 @@ pub struct Keybindings {
     pub help: String,
     #[serde(default = "default_quit")]
     pub quit: String,
+
+    // Export
+    #[serde(default = "default_export_article")]
+    pub export_article: String,
 }
 
 // Default keybinding functions
@@ -258,6 +262,9 @@ fn default_help() -> String {
 fn default_quit() -> String {
     "q".to_string()
 }
+fn default_export_article() -> String {
+    "s".to_string()
+}
 
 impl Default for Keybindings {
     fn default() -> Self {
@@ -287,6 +294,7 @@ impl Default for Keybindings {
             import_opml: default_import_opml(),
             help: default_help(),
             quit: default_quit(),
+            export_article: default_export_article(),
         }
     }
 }
@@ -1768,6 +1776,132 @@ impl App {
             }
         }
         None
+    }
+
+    /// Formats a feed item as markdown for export
+    fn format_article_markdown(&self, item: &FeedItem) -> String {
+        let mut output = String::new();
+
+        // Title
+        output.push_str(&format!("# {}\n\n", item.title));
+
+        // Metadata
+        if let Some(published) = item.published {
+            if let Ok(duration) = published.duration_since(SystemTime::UNIX_EPOCH) {
+                let secs = duration.as_secs() as i64;
+                if let Some(dt) = chrono::DateTime::from_timestamp(secs, 0) {
+                    output.push_str(&format!("**Date:** {}\n\n", dt.format("%Y-%m-%d %H:%M")));
+                }
+            }
+        }
+
+        if !item.link.is_empty() {
+            output.push_str(&format!("**Link:** {}\n\n", item.link));
+        }
+
+        // Status
+        let read_status = if self.read_items.contains(&item.id) {
+            "Read"
+        } else {
+            "Unread"
+        };
+        let fav_status = if self.favorites.contains(&item.id) {
+            "★ Favorited"
+        } else {
+            ""
+        };
+        if !fav_status.is_empty() {
+            output.push_str(&format!("**Status:** {} | {}\n\n", read_status, fav_status));
+        } else {
+            output.push_str(&format!("**Status:** {}\n\n", read_status));
+        }
+
+        output.push_str("---\n\n");
+
+        // Content - convert HTML to plain text
+        let plain_text = html2text::from_read(item.description.as_bytes(), 80);
+        output.push_str(&plain_text);
+
+        output
+    }
+
+    /// Exports the currently selected article to clipboard
+    pub fn export_article_to_clipboard(&mut self) {
+        let item = if let Some(item) = self.get_preview_item() {
+            item.clone()
+        } else {
+            self.error_message = Some("No article selected".to_string());
+            return;
+        };
+
+        let content = self.format_article_markdown(&item);
+
+        match arboard::Clipboard::new() {
+            Ok(mut clipboard) => match clipboard.set_text(&content) {
+                Ok(()) => {
+                    info!("Exported article to clipboard: {}", item.title);
+                    self.error_message = Some(format!("Copied to clipboard: {}", item.title));
+                }
+                Err(e) => {
+                    error!("Failed to copy to clipboard: {}", e);
+                    self.error_message = Some(format!("Failed to copy to clipboard: {}", e));
+                }
+            },
+            Err(e) => {
+                error!("Failed to access clipboard: {}", e);
+                self.error_message = Some(format!("Failed to access clipboard: {}", e));
+            }
+        }
+    }
+
+    /// Exports the currently selected article to a file
+    pub fn export_article_to_file(&mut self) {
+        let item = if let Some(item) = self.get_preview_item() {
+            item.clone()
+        } else {
+            self.error_message = Some("No article selected".to_string());
+            return;
+        };
+
+        let content = self.format_article_markdown(&item);
+
+        // Create a safe filename from the title
+        let safe_title: String = item
+            .title
+            .chars()
+            .take(50)
+            .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' })
+            .collect::<String>()
+            .trim()
+            .replace(' ', "_");
+
+        // Get export directory
+        let mut path = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
+        path.push("reedy");
+        path.push("exports");
+        if let Err(e) = fs::create_dir_all(&path) {
+            error!("Failed to create export directory: {}", e);
+            self.error_message = Some(format!("Failed to create export directory: {}", e));
+            return;
+        }
+
+        // Add timestamp to filename to avoid collisions
+        let timestamp = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        path.push(format!("{}_{}.md", safe_title, timestamp));
+
+        match fs::write(&path, content) {
+            Ok(()) => {
+                info!("Exported article to: {}", path.display());
+                self.error_message = Some(format!("Saved to: {}", path.display()));
+            }
+            Err(e) => {
+                error!("Failed to write file: {}", e);
+                self.error_message = Some(format!("Failed to save article: {}", e));
+            }
+        }
     }
 
     /// Enters vi-style command mode (triggered by ':')

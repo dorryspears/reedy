@@ -1105,3 +1105,55 @@ This is a common pattern in Rust where fields must stay alive for their side eff
 
 **Tests:** All tests pass (58 total: 47 app tests, 11 ui tests)
 
+---
+
+### Implemented: Low Priority Feature #15 - Export Articles
+
+**Location:** `src/app.rs`, `src/handler.rs`, `src/ui.rs`
+
+**Description:** Added the ability to export/save articles to clipboard (markdown format) or to a file. This allows users to save interesting articles for later reference outside of the application.
+
+**Implementation Details:**
+
+1. **New Keybinding struct field:** Added `export_article` field with default value `"s"`
+
+2. **New App methods:**
+   - `format_article_markdown()` - Formats a feed item as markdown with title, date, link, status, and content
+   - `export_article_to_clipboard()` - Copies the selected article to clipboard in markdown format
+   - `export_article_to_file()` - Saves the selected article to a markdown file
+
+3. **Export to clipboard (`s` key):**
+   - Works in FeedList, Favorites, and Preview modes
+   - Formats article as markdown with metadata and content
+   - Uses the arboard crate for cross-platform clipboard access
+   - Shows confirmation message on success
+
+4. **Export to file (`S` key):**
+   - Saves article to `~/.local/share/reedy/exports/` directory
+   - Filename is generated from article title (sanitized) + timestamp to avoid collisions
+   - Format: `{title}_{timestamp}.md`
+   - Shows full path on success
+
+5. **Markdown format includes:**
+   - Article title as H1 header
+   - Publication date (if available)
+   - Article link
+   - Read/favorite status
+   - Full article content (HTML converted to plain text)
+
+6. **UI Updates:**
+   - Command bar in FeedList/Favorites shows `[s/S] Export` option
+   - Command bar in Preview shows `[s] Copy  [S] Save` options
+   - Help menus updated with Export section documenting both keys
+
+**Files changed:**
+- `src/app.rs` - Added `export_article` to Keybindings struct, added export methods
+- `src/handler.rs` - Added `s` and `S` key bindings to FeedList, Favorites, and Preview modes
+- `src/ui.rs` - Updated command bars and help menus with export documentation
+- `tests/app_tests.rs` - Added 3 new tests:
+  - `test_export_article_no_selection` - verifies error handling when no article selected
+  - `test_export_article_file_no_selection` - verifies file export error handling
+  - `test_keybindings_export_article_default` - verifies default keybinding value
+
+**Tests:** All tests pass (61 total: 50 app tests, 11 ui tests)
+

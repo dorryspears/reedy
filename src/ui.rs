@@ -499,6 +499,25 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                 "{:<14} - Refresh feed cache",
                 format_keybinding(&kb.refresh)
             )),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "Export",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(colors.secondary),
+            )]),
+            Line::from(format!(
+                "{:<14} - Copy article to clipboard (markdown)",
+                format_keybinding(&kb.export_article)
+            )),
+            Line::from("S              - Save article to file"),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "UI",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(colors.secondary),
+            )]),
             Line::from(format!(
                 "{:<14} - Toggle this help menu",
                 format_keybinding(&kb.help)
@@ -682,6 +701,25 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                 "{:<14} - Return to all feeds view",
                 format_keybinding(&kb.toggle_favorites_view)
             )),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "Export",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(colors.secondary),
+            )]),
+            Line::from(format!(
+                "{:<14} - Copy article to clipboard (markdown)",
+                format_keybinding(&kb.export_article)
+            )),
+            Line::from("S              - Save article to file"),
+            Line::from(""),
+            Line::from(vec![Span::styled(
+                "UI",
+                Style::default()
+                    .add_modifier(Modifier::UNDERLINED)
+                    .fg(colors.secondary),
+            )]),
             Line::from(format!(
                 "{:<14} - Toggle this help menu",
                 format_keybinding(&kb.help)
@@ -908,7 +946,7 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
     let commands = if app.input_mode == InputMode::Help {
         "[q/Esc/?] Exit Help".to_string()
     } else if app.input_mode == InputMode::Preview {
-        "[↑↓/jk] Scroll  [PgUp/PgDn] Page  [o] Open in Browser  [r] Toggle Read  [f] Toggle Favorite  [Esc/q/p] Close".to_string()
+        "[↑↓/jk] Scroll  [PgUp/PgDn] Page  [o] Open  [r] Read  [f] Fav  [s] Copy  [S] Save  [Esc/q/p] Close".to_string()
     } else if app.input_mode == InputMode::Searching {
         format!("Search: {}█  [Enter] Confirm  [Esc] Cancel", app.search_query)
     } else if app.input_mode == InputMode::Command {
@@ -919,18 +957,18 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
                 if app.current_feed_content.is_empty() {
                     "[m] Manage Feeds  [c] Refresh Cache  [F] Favorites  [?] Help  [q] Quit".to_string()
                 } else if app.filtered_indices.is_some() {
-                    "[↑↓] Navigate  [/] Search  [Esc] Clear Filter  [p] Preview  [o] Open  [f] Favorite  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [/] Search  [Esc] Clear  [p] Preview  [o] Open  [f] Fav  [s/S] Export  [?] Help".to_string()
                 } else {
-                    "[↑↓] Navigate  [/] Search  [p] Preview  [o] Open  [m] Manage  [c] Refresh  [r] Read  [f] Favorite  [F] Favorites  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [/] Search  [p] Preview  [o] Open  [m] Manage  [r] Read  [f] Fav  [s/S] Export  [?] Help".to_string()
                 }
             }
             PageMode::Favorites => {
                 if app.current_feed_content.is_empty() {
                     "[F] Back to Feeds  [?] Help  [q] Quit".to_string()
                 } else if app.filtered_indices.is_some() {
-                    "[↑↓] Navigate  [/] Search  [Esc] Clear Filter  [p] Preview  [o] Open  [f] Favorite  [F] Back  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [/] Search  [Esc] Clear  [p] Preview  [o] Open  [f] Fav  [s/S] Export  [F] Back  [?] Help".to_string()
                 } else {
-                    "[↑↓] Navigate  [/] Search  [p] Preview  [o] Open  [f] Favorite  [F] Back to Feeds  [?] Help  [q] Quit".to_string()
+                    "[↑↓] Navigate  [/] Search  [p] Preview  [o] Open  [f] Fav  [s/S] Export  [F] Back  [?] Help".to_string()
                 }
             }
             PageMode::FeedManager => match app.input_mode {

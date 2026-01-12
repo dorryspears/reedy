@@ -1028,3 +1028,27 @@ fn test_command_scroll_to_top() {
     assert!(result.is_ok());
     assert_eq!(app.scroll, 0);
 }
+
+#[test]
+fn test_export_article_no_selection() {
+    let mut app = App::default();
+    // No article selected
+    app.export_article_to_clipboard();
+    assert!(app.error_message.is_some());
+    assert!(app.error_message.unwrap().contains("No article selected"));
+}
+
+#[test]
+fn test_export_article_file_no_selection() {
+    let mut app = App::default();
+    // No article selected
+    app.export_article_to_file();
+    assert!(app.error_message.is_some());
+    assert!(app.error_message.unwrap().contains("No article selected"));
+}
+
+#[test]
+fn test_keybindings_export_article_default() {
+    let keybindings = reedy::app::Keybindings::default();
+    assert_eq!(keybindings.export_article, "s");
+}

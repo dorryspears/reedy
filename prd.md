@@ -334,9 +334,17 @@ https://news.site.com/atom.xml
 - Mouse scroll in preview mode scrolls the article content
 - Mouse events are ignored during text input modes (Adding, Importing, Searching, etc.)
 
-#### 15. Export Articles
-**Description:** Save articles to file (markdown, plain text) or copy to clipboard.
+#### ~~15. Export Articles~~ DONE
+**Description:** Save articles to file (markdown) or copy to clipboard.
 **Value:** Allows saving interesting articles for later reference.
+
+**Implementation:**
+- Press `s` in FeedList, Favorites, or Preview mode to copy the selected article to clipboard (markdown format)
+- Press `S` (shift+s) to save the article to a markdown file
+- Articles are saved to `~/.local/share/reedy/exports/` with a timestamped filename
+- Export format includes: title, date, link, read/favorite status, and full article content
+- HTML content is converted to plain text for readability
+- Configurable via `keybindings.export_article` in config.json
 
 #### 16. Feed Health Indicators
 **Description:** Visual indicators showing feed status (healthy, slow, broken, last updated).
@@ -381,7 +389,7 @@ The application uses `~/.config/reedy/config.json` for user configuration:
 **Currently Implemented:**
 - ~~Cache duration~~ ✓ (`cache_duration_mins`)
 - ~~HTTP timeout~~ ✓ (`http_timeout_secs`)
-- ~~Default keybindings~~ ✓ (`keybindings` object with 24 customizable keys)
+- ~~Default keybindings~~ ✓ (`keybindings` object with 25 customizable keys)
 - ~~Theme/colors~~ ✓ (`theme` object with 8 color fields)
 - ~~Auto-refresh interval~~ ✓ (`auto_refresh_mins`)
 
