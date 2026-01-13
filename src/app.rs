@@ -1586,6 +1586,16 @@ impl App {
         let client = create_http_client(timeout_secs);
         match client.get(url.as_str()).send().await {
             Ok(response) => {
+                // Check for HTTP errors before trying to parse
+                if !response.status().is_success() {
+                    error!(
+                        "HTTP error {} when fetching feed: {}",
+                        response.status(),
+                        url
+                    );
+                    return Ok(None);
+                }
+
                 let bytes = response.bytes().await?;
                 // Try RSS first
                 if let Ok(channel) = Channel::read_from(&bytes[..]) {
@@ -1667,6 +1677,17 @@ impl App {
                 debug!("Fetching feed content from URL: {}", url);
                 let client = create_http_client(self.config.http_timeout_secs);
                 let response = client.get(url.as_str()).send().await?;
+
+                // Check for HTTP errors
+                if !response.status().is_success() {
+                    self.error_message = Some(format!(
+                        "HTTP error {}: {}",
+                        response.status(),
+                        response.status().canonical_reason().unwrap_or("Unknown error")
+                    ));
+                    return Ok(());
+                }
+
                 let content = response.bytes().await?;
 
                 let feed_title_clone = feed_title.clone();
@@ -2394,6 +2415,17 @@ impl App {
             let client = create_http_client(self.config.http_timeout_secs);
             match client.get(&feed_info.url).send().await {
                 Ok(response) => {
+                    // Check for HTTP errors
+                    if !response.status().is_success() {
+                        error!(
+                            "HTTP error {} when fetching {}: {}",
+                            response.status(),
+                            feed_info.url,
+                            response.status().canonical_reason().unwrap_or("Unknown")
+                        );
+                        continue;
+                    }
+
                     if let Ok(content) = response.bytes().await {
                         // Try RSS first
                         let feed_items = match Channel::read_from(&content[..]) {
@@ -2457,6 +2489,29 @@ impl App {
             match client.get(&feed_info.url).send().await {
                 Ok(response) => {
                     let response_time_ms = start_time.elapsed().as_millis() as u64;
+
+                    // Check for HTTP errors
+                    if !response.status().is_success() {
+                        error!(
+                            "HTTP error {} when refreshing {}: {}",
+                            response.status(),
+                            feed_info.url,
+                            response.status().canonical_reason().unwrap_or("Unknown")
+                        );
+                        let existing = self.feed_health.get(&feed_info.url);
+                        let consecutive = existing.map(|h| h.consecutive_failures + 1).unwrap_or(1);
+                        self.feed_health.insert(
+                            feed_info.url.clone(),
+                            FeedHealth {
+                                status: FeedStatus::Broken,
+                                last_success: existing.and_then(|h| h.last_success),
+                                last_error: Some(format!("HTTP {}", response.status())),
+                                last_response_time_ms: Some(response_time_ms),
+                                consecutive_failures: consecutive,
+                            },
+                        );
+                        continue;
+                    }
 
                     match response.bytes().await {
                         Ok(content) => {
@@ -2732,7 +2787,14 @@ impl App {
 pub async fn fetch_feed(url: &str, timeout_secs: Option<u64>) -> AppResult<Vec<FeedItem>> {
     debug!("Fetching feed from URL: {}", url);
     let client = create_http_client(timeout_secs.unwrap_or(DEFAULT_HTTP_TIMEOUT_SECS));
-    let response = client.get(url).send().await?.bytes().await?;
+    let resp = client.get(url).send().await?;
+
+    // Check for HTTP errors
+    if !resp.status().is_success() {
+        return Err(format!("HTTP error {}: {}", resp.status(), resp.status().canonical_reason().unwrap_or("Unknown")).into());
+    }
+
+    let response = resp.bytes().await?;
 
     // Try parsing as RSS first
     match Channel::read_from(&response[..]) {

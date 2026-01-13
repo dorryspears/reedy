@@ -1289,3 +1289,5 @@ fn test_select_next_does_not_mark_read_in_feed_manager() {
     // No items should be marked as read (we're in FeedManager mode)
     assert!(!app.is_item_read(&item1));
 }
+
+
