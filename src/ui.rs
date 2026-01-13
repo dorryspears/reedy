@@ -1049,10 +1049,38 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
         }
     };
 
-    // Truncate the commands to fit in the available width
-    let truncated_commands = truncate_text(&commands, area.width.saturating_sub(2));
+    // Check for status or error messages to display
+    let display_text = if let Some(status) = &app.status_message {
+        // Show status message in green
+        Line::from(vec![
+            Span::styled(
+                format!(" {} ", status),
+                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" | ", Style::default().fg(colors.muted)),
+            Span::styled(
+                truncate_text(&commands, area.width.saturating_sub(status.len() as u16 + 8)),
+                Style::default().fg(colors.secondary),
+            ),
+        ])
+    } else if let Some(error) = &app.error_message {
+        // Show error message in red
+        Line::from(vec![
+            Span::styled(
+                format!(" {} ", error),
+                Style::default().fg(colors.error).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" | ", Style::default().fg(colors.muted)),
+            Span::styled(
+                truncate_text(&commands, area.width.saturating_sub(error.len() as u16 + 8)),
+                Style::default().fg(colors.secondary),
+            ),
+        ])
+    } else {
+        Line::from(truncate_text(&commands, area.width.saturating_sub(2)))
+    };
 
-    let command_bar = Paragraph::new(truncated_commands)
+    let command_bar = Paragraph::new(display_text)
         .style(Style::default().fg(colors.secondary))
         .block(Block::default().borders(Borders::ALL))
         .alignment(Alignment::Left);

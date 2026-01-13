@@ -532,6 +532,8 @@ pub struct App {
     pub selected_index: Option<usize>,
     pub current_feed_content: Vec<FeedItem>,
     pub error_message: Option<String>,
+    /// Status message shown at bottom (for success notifications)
+    pub status_message: Option<String>,
     save_path: PathBuf,
     read_items: HashSet<String>,
     pub favorites: HashSet<String>,
@@ -569,6 +571,7 @@ impl Default for App {
             selected_index: None,
             current_feed_content: Vec::new(),
             error_message: None,
+            status_message: None,
             save_path: Self::get_save_path(),
             read_items: HashSet::new(),
             favorites: HashSet::new(),
@@ -1033,6 +1036,7 @@ impl App {
     }
 
     pub fn select_previous(&mut self) {
+        self.status_message = None; // Clear status on navigation
         if let Some(current) = self.selected_index {
             let len = match self.page_mode {
                 PageMode::FeedList | PageMode::Favorites => self.visible_item_count(),
@@ -1047,6 +1051,7 @@ impl App {
     }
 
     pub fn select_next(&mut self) {
+        self.status_message = None; // Clear status on navigation
         if let Some(current) = self.selected_index {
             let len = match self.page_mode {
                 PageMode::FeedList | PageMode::Favorites => self.visible_item_count(),
@@ -1832,17 +1837,19 @@ impl App {
                 if let Some(item) = self.current_feed_content.get(actual_index) {
                     if !item.link.is_empty() {
                         match arboard::Clipboard::new() {
-                            Ok(mut clipboard) => {
-                                if clipboard.set_text(&item.link).is_ok() {
-                                    self.error_message = Some("Link copied to clipboard".to_string());
+                            Ok(mut clipboard) => match clipboard.set_text(&item.link) {
+                                Ok(()) => {
+                                    self.status_message = Some("Link copied!".to_string());
                                     debug!("Copied link to clipboard: {}", item.link);
-                                } else {
-                                    self.error_message = Some("Failed to copy link".to_string());
                                 }
-                            }
+                                Err(e) => {
+                                    error!("Failed to copy to clipboard: {}", e);
+                                    self.error_message = Some(format!("Failed to copy: {}", e));
+                                }
+                            },
                             Err(e) => {
                                 error!("Failed to access clipboard: {}", e);
-                                self.error_message = Some("Failed to access clipboard".to_string());
+                                self.error_message = Some(format!("Clipboard error: {}", e));
                             }
                         }
                     }
@@ -1852,6 +1859,12 @@ impl App {
     }
 
     pub fn clear_error(&mut self) {
+        self.error_message = None;
+    }
+
+    /// Clears both status and error messages
+    pub fn clear_messages(&mut self) {
+        self.status_message = None;
         self.error_message = None;
     }
 
@@ -2074,16 +2087,16 @@ impl App {
             Ok(mut clipboard) => match clipboard.set_text(&content) {
                 Ok(()) => {
                     info!("Exported article to clipboard: {}", item.title);
-                    self.error_message = Some(format!("Copied to clipboard: {}", item.title));
+                    self.status_message = Some("Article copied!".to_string());
                 }
                 Err(e) => {
                     error!("Failed to copy to clipboard: {}", e);
-                    self.error_message = Some(format!("Failed to copy to clipboard: {}", e));
+                    self.error_message = Some(format!("Failed to copy: {}", e));
                 }
             },
             Err(e) => {
                 error!("Failed to access clipboard: {}", e);
-                self.error_message = Some(format!("Failed to access clipboard: {}", e));
+                self.error_message = Some(format!("Clipboard error: {}", e));
             }
         }
     }
