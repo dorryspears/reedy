@@ -9,7 +9,7 @@ use quick_xml::{Reader, Writer};
 use reqwest;
 use rss::Channel;
 use serde::{Deserialize, Serialize};
-use std::io::Cursor;
+use std::io::{Cursor, Write};
 use std::{collections::HashMap, collections::HashSet, error, fs, path::PathBuf, time::Duration, time::SystemTime};
 
 /// Default HTTP request timeout in seconds
@@ -26,6 +26,31 @@ const DEFAULT_NOTIFICATIONS_ENABLED: bool = false;
 
 /// Default mark read on scroll setting (false = disabled)
 const DEFAULT_MARK_READ_ON_SCROLL: bool = false;
+
+/// Copies text to clipboard using OSC 52 escape sequence.
+/// This works over SSH and through tmux, unlike native clipboard APIs.
+/// Returns Ok(()) on success, Err with message on failure.
+pub fn copy_to_clipboard_osc52(text: &str) -> Result<(), String> {
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine;
+
+    let encoded = STANDARD.encode(text);
+    // OSC 52 sequence: \x1b]52;c;<base64>\x07
+    // 'c' = clipboard selection
+    let osc52_seq = format!("\x1b]52;c;{}\x07", encoded);
+
+    // Write directly to stdout
+    let mut stdout = std::io::stdout();
+    stdout
+        .write_all(osc52_seq.as_bytes())
+        .map_err(|e| format!("Failed to write OSC 52: {}", e))?;
+    stdout
+        .flush()
+        .map_err(|e| format!("Failed to flush stdout: {}", e))?;
+
+    debug!("Copied {} bytes to clipboard via OSC 52", text.len());
+    Ok(())
+}
 
 /// Color theme for the application UI
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1141,7 +1166,7 @@ impl App {
         }
     }
 
-    /// Exports all feed URLs to the clipboard, one URL per line
+    /// Exports all feed URLs to the clipboard using OSC 52, one URL per line
     pub fn export_feeds_to_clipboard(&mut self) {
         if self.rss_feeds.is_empty() {
             self.error_message = Some("No feeds to export".to_string());
@@ -1154,20 +1179,14 @@ impl App {
             .map(|f| f.url.as_str())
             .collect::<Vec<_>>()
             .join("\n");
-        match arboard::Clipboard::new() {
-            Ok(mut clipboard) => match clipboard.set_text(&feed_list) {
-                Ok(()) => {
-                    info!("Exported {} feeds to clipboard", self.rss_feeds.len());
-                    self.error_message = Some(format!("Exported {} feeds to clipboard", self.rss_feeds.len()));
-                }
-                Err(e) => {
-                    error!("Failed to copy to clipboard: {}", e);
-                    self.error_message = Some(format!("Failed to copy to clipboard: {}", e));
-                }
-            },
+        match copy_to_clipboard_osc52(&feed_list) {
+            Ok(()) => {
+                info!("Exported {} feeds to clipboard", self.rss_feeds.len());
+                self.status_message = Some(format!("Exported {} feeds to clipboard", self.rss_feeds.len()));
+            }
             Err(e) => {
-                error!("Failed to access clipboard: {}", e);
-                self.error_message = Some(format!("Failed to access clipboard: {}", e));
+                error!("Failed to copy to clipboard: {}", e);
+                self.error_message = Some(format!("Failed to copy to clipboard: {}", e));
             }
         }
     }
@@ -1830,26 +1849,20 @@ impl App {
         }
     }
 
-    /// Copies the selected item's link to the clipboard
+    /// Copies the selected item's link to the clipboard using OSC 52
     pub fn copy_selected_link(&mut self) {
         if let Some(visible_index) = self.selected_index {
             if let Some(actual_index) = self.get_actual_index(visible_index) {
                 if let Some(item) = self.current_feed_content.get(actual_index) {
                     if !item.link.is_empty() {
-                        match arboard::Clipboard::new() {
-                            Ok(mut clipboard) => match clipboard.set_text(&item.link) {
-                                Ok(()) => {
-                                    self.status_message = Some("Link copied!".to_string());
-                                    debug!("Copied link to clipboard: {}", item.link);
-                                }
-                                Err(e) => {
-                                    error!("Failed to copy to clipboard: {}", e);
-                                    self.error_message = Some(format!("Failed to copy: {}", e));
-                                }
-                            },
+                        match copy_to_clipboard_osc52(&item.link) {
+                            Ok(()) => {
+                                self.status_message = Some("Link copied!".to_string());
+                                debug!("Copied link to clipboard: {}", item.link);
+                            }
                             Err(e) => {
-                                error!("Failed to access clipboard: {}", e);
-                                self.error_message = Some(format!("Clipboard error: {}", e));
+                                error!("Failed to copy to clipboard: {}", e);
+                                self.error_message = Some(format!("Failed to copy: {}", e));
                             }
                         }
                     }
@@ -2072,7 +2085,7 @@ impl App {
         output
     }
 
-    /// Exports the currently selected article to clipboard
+    /// Exports the currently selected article to clipboard using OSC 52
     pub fn export_article_to_clipboard(&mut self) {
         let item = if let Some(item) = self.get_preview_item() {
             item.clone()
@@ -2083,20 +2096,14 @@ impl App {
 
         let content = self.format_article_markdown(&item);
 
-        match arboard::Clipboard::new() {
-            Ok(mut clipboard) => match clipboard.set_text(&content) {
-                Ok(()) => {
-                    info!("Exported article to clipboard: {}", item.title);
-                    self.status_message = Some("Article copied!".to_string());
-                }
-                Err(e) => {
-                    error!("Failed to copy to clipboard: {}", e);
-                    self.error_message = Some(format!("Failed to copy: {}", e));
-                }
-            },
+        match copy_to_clipboard_osc52(&content) {
+            Ok(()) => {
+                info!("Exported article to clipboard: {}", item.title);
+                self.status_message = Some("Article copied!".to_string());
+            }
             Err(e) => {
-                error!("Failed to access clipboard: {}", e);
-                self.error_message = Some(format!("Clipboard error: {}", e));
+                error!("Failed to copy to clipboard: {}", e);
+                self.error_message = Some(format!("Failed to copy: {}", e));
             }
         }
     }
