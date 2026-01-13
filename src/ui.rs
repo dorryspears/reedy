@@ -521,6 +521,10 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                 format_keybinding(&kb.open_in_browser)
             )),
             Line::from(format!(
+                "{:<14} - Copy link to clipboard",
+                format_keybinding(&kb.copy_link)
+            )),
+            Line::from(format!(
                 "{:<14} - Toggle read status of selected item",
                 format_keybinding(&kb.toggle_read)
             )),
@@ -741,6 +745,10 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
             Line::from(format!(
                 "{:<14} - Open selected item in browser",
                 format_keybinding(&kb.open_in_browser)
+            )),
+            Line::from(format!(
+                "{:<14} - Copy link to clipboard",
+                format_keybinding(&kb.copy_link)
             )),
             Line::from(format!(
                 "{:<14} - Remove item from favorites",
@@ -995,7 +1003,7 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
     let commands = if app.input_mode == InputMode::Help {
         "[q/Esc/?] Exit Help".to_string()
     } else if app.input_mode == InputMode::Preview {
-        "[↑↓/jk] Scroll  [PgUp/PgDn] Page  [o] Open  [r] Read  [f] Fav  [s] Copy  [S] Save  [Esc/q/p] Close".to_string()
+        "[↑↓/jk] Scroll  [PgUp/PgDn] Page  [o/O] Open/Copy  [r] Read  [f] Fav  [s] Copy  [S] Save  [Esc/q/p] Close".to_string()
     } else if app.input_mode == InputMode::Searching {
         format!("Search: {}█  [Enter] Confirm  [Esc] Cancel", app.search_query)
     } else if app.input_mode == InputMode::Command {
@@ -1006,18 +1014,18 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
                 if app.current_feed_content.is_empty() {
                     "[m] Manage Feeds  [c] Refresh Cache  [F] Favorites  [?] Help  [q] Quit".to_string()
                 } else if app.filtered_indices.is_some() {
-                    "[↑↓] Navigate  [/] Search  [u] Unread  [Esc] Clear  [p] Preview  [o] Open  [f] Fav  [?] Help".to_string()
+                    "[↑↓] Navigate  [/] Search  [u] Unread  [Esc] Clear  [p] Preview  [o/O] Open/Copy  [f] Fav  [?] Help".to_string()
                 } else {
-                    "[↑↓] Navigate  [/] Search  [u] Unread  [p] Preview  [o] Open  [m] Manage  [r] Read  [f] Fav  [?] Help".to_string()
+                    "[↑↓] Navigate  [/] Search  [u] Unread  [p] Preview  [o/O] Open/Copy  [m] Manage  [r] Read  [f] Fav  [?] Help".to_string()
                 }
             }
             PageMode::Favorites => {
                 if app.current_feed_content.is_empty() {
                     "[F] Back to Feeds  [?] Help  [q] Quit".to_string()
                 } else if app.filtered_indices.is_some() {
-                    "[↑↓] Navigate  [/] Search  [u] Unread  [Esc] Clear  [p] Preview  [o] Open  [f] Fav  [F] Back  [?] Help".to_string()
+                    "[↑↓] Navigate  [/] Search  [u] Unread  [Esc] Clear  [p] Preview  [o/O] Open/Copy  [f] Fav  [F] Back  [?] Help".to_string()
                 } else {
-                    "[↑↓] Navigate  [/] Search  [u] Unread  [p] Preview  [o] Open  [f] Fav  [F] Back  [?] Help".to_string()
+                    "[↑↓] Navigate  [/] Search  [u] Unread  [p] Preview  [o/O] Open/Copy  [f] Fav  [F] Back  [?] Help".to_string()
                 }
             }
             PageMode::FeedManager => match app.input_mode {

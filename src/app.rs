@@ -144,6 +144,8 @@ pub struct Keybindings {
     pub select: String,
     #[serde(default = "default_open_in_browser")]
     pub open_in_browser: String,
+    #[serde(default = "default_copy_link")]
+    pub copy_link: String,
     #[serde(default = "default_toggle_read")]
     pub toggle_read: String,
     #[serde(default = "default_mark_all_read")]
@@ -219,6 +221,9 @@ fn default_select() -> String {
 fn default_open_in_browser() -> String {
     "o".to_string()
 }
+fn default_copy_link() -> String {
+    "O".to_string()
+}
 fn default_toggle_read() -> String {
     "r".to_string()
 }
@@ -288,6 +293,7 @@ impl Default for Keybindings {
             scroll_to_bottom: default_scroll_to_bottom(),
             select: default_select(),
             open_in_browser: default_open_in_browser(),
+            copy_link: default_copy_link(),
             toggle_read: default_toggle_read(),
             mark_all_read: default_mark_all_read(),
             toggle_favorite: default_toggle_favorite(),
@@ -1813,6 +1819,32 @@ impl App {
                 if let Some(item) = self.current_feed_content.get(actual_index) {
                     if !item.link.is_empty() {
                         let _ = open::that(&item.link);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Copies the selected item's link to the clipboard
+    pub fn copy_selected_link(&mut self) {
+        if let Some(visible_index) = self.selected_index {
+            if let Some(actual_index) = self.get_actual_index(visible_index) {
+                if let Some(item) = self.current_feed_content.get(actual_index) {
+                    if !item.link.is_empty() {
+                        match arboard::Clipboard::new() {
+                            Ok(mut clipboard) => {
+                                if clipboard.set_text(&item.link).is_ok() {
+                                    self.error_message = Some("Link copied to clipboard".to_string());
+                                    debug!("Copied link to clipboard: {}", item.link);
+                                } else {
+                                    self.error_message = Some("Failed to copy link".to_string());
+                                }
+                            }
+                            Err(e) => {
+                                error!("Failed to access clipboard: {}", e);
+                                self.error_message = Some("Failed to access clipboard".to_string());
+                            }
+                        }
                     }
                 }
             }

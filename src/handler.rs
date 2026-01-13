@@ -130,6 +130,8 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             app.preview_page_down();
         } else if key_matches(&key_event, &kb.open_in_browser) {
             app.open_selected_feed();
+        } else if key_matches(&key_event, &kb.copy_link) {
+            app.copy_selected_link();
         } else if key_matches(&key_event, &kb.toggle_read) {
             app.toggle_read_status();
         } else if key_matches(&key_event, &kb.toggle_favorite) {
@@ -176,6 +178,8 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 app.toggle_feed_manager();
             } else if key_matches(&key_event, &kb.open_in_browser) {
                 app.open_selected_feed();
+            } else if key_matches(&key_event, &kb.copy_link) {
+                app.copy_selected_link();
             } else if key_matches(&key_event, &kb.move_up) {
                 app.select_previous();
                 app.ensure_selection_visible();
@@ -373,6 +377,8 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 app.open_preview();
             } else if key_matches(&key_event, &kb.open_in_browser) {
                 app.open_selected_feed();
+            } else if key_matches(&key_event, &kb.copy_link) {
+                app.copy_selected_link();
             } else if key_matches(&key_event, &kb.move_up) {
                 app.select_previous();
                 app.ensure_selection_visible();
