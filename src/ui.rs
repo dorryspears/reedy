@@ -103,14 +103,20 @@ pub fn render(app: &App, frame: &mut Frame) {
         PageMode::Favorites => "Favorites",
     };
 
+    // Add indicators for active filters and auto-refresh
+    let mut title_text = base_title.to_string();
+
+    // Add unread-only indicator
+    if app.show_unread_only {
+        title_text = format!("{} [Unread Only]", title_text);
+    }
+
     // Add auto-refresh indicator if enabled
-    let title_text = if let Some(remaining) = app.time_until_next_refresh() {
+    if let Some(remaining) = app.time_until_next_refresh() {
         let mins = remaining.as_secs() / 60;
         let secs = remaining.as_secs() % 60;
-        format!("{} [Auto: {}:{:02}]", base_title, mins, secs)
-    } else {
-        base_title.to_string()
-    };
+        title_text = format!("{} [Auto: {}:{:02}]", title_text, mins, secs);
+    }
 
     // Create a layout for the title area to position the book icon and title text
     let title_layout = Layout::default()
@@ -485,7 +491,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
             )),
             Line::from(""),
             Line::from(vec![Span::styled(
-                "Search",
+                "Search & Filter",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(colors.secondary),
@@ -494,7 +500,11 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                 "{:<14} - Start search/filter",
                 format_keybinding(&kb.start_search)
             )),
-            Line::from("Esc            - Clear search filter (when active)"),
+            Line::from(format!(
+                "{:<14} - Toggle unread-only filter",
+                format_keybinding(&kb.toggle_unread_only)
+            )),
+            Line::from("Esc            - Clear all filters"),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "Actions",
@@ -703,7 +713,7 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
             )),
             Line::from(""),
             Line::from(vec![Span::styled(
-                "Search",
+                "Search & Filter",
                 Style::default()
                     .add_modifier(Modifier::UNDERLINED)
                     .fg(colors.secondary),
@@ -712,7 +722,11 @@ fn render_help_menu(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeColo
                 "{:<14} - Start search/filter",
                 format_keybinding(&kb.start_search)
             )),
-            Line::from("Esc            - Clear search filter (when active)"),
+            Line::from(format!(
+                "{:<14} - Toggle unread-only filter",
+                format_keybinding(&kb.toggle_unread_only)
+            )),
+            Line::from("Esc            - Clear all filters"),
             Line::from(""),
             Line::from(vec![Span::styled(
                 "Actions",
@@ -992,18 +1006,18 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
                 if app.current_feed_content.is_empty() {
                     "[m] Manage Feeds  [c] Refresh Cache  [F] Favorites  [?] Help  [q] Quit".to_string()
                 } else if app.filtered_indices.is_some() {
-                    "[↑↓] Navigate  [/] Search  [Esc] Clear  [p] Preview  [o] Open  [f] Fav  [s/S] Export  [?] Help".to_string()
+                    "[↑↓] Navigate  [/] Search  [u] Unread  [Esc] Clear  [p] Preview  [o] Open  [f] Fav  [?] Help".to_string()
                 } else {
-                    "[↑↓] Navigate  [/] Search  [p] Preview  [o] Open  [m] Manage  [r] Read  [f] Fav  [s/S] Export  [?] Help".to_string()
+                    "[↑↓] Navigate  [/] Search  [u] Unread  [p] Preview  [o] Open  [m] Manage  [r] Read  [f] Fav  [?] Help".to_string()
                 }
             }
             PageMode::Favorites => {
                 if app.current_feed_content.is_empty() {
                     "[F] Back to Feeds  [?] Help  [q] Quit".to_string()
                 } else if app.filtered_indices.is_some() {
-                    "[↑↓] Navigate  [/] Search  [Esc] Clear  [p] Preview  [o] Open  [f] Fav  [s/S] Export  [F] Back  [?] Help".to_string()
+                    "[↑↓] Navigate  [/] Search  [u] Unread  [Esc] Clear  [p] Preview  [o] Open  [f] Fav  [F] Back  [?] Help".to_string()
                 } else {
-                    "[↑↓] Navigate  [/] Search  [p] Preview  [o] Open  [f] Fav  [s/S] Export  [F] Back  [?] Help".to_string()
+                    "[↑↓] Navigate  [/] Search  [u] Unread  [p] Preview  [o] Open  [f] Fav  [F] Back  [?] Help".to_string()
                 }
             }
             PageMode::FeedManager => match app.input_mode {

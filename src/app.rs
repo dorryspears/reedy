@@ -155,9 +155,11 @@ pub struct Keybindings {
     #[serde(default = "default_refresh")]
     pub refresh: String,
 
-    // Search
+    // Search & Filter
     #[serde(default = "default_start_search")]
     pub start_search: String,
+    #[serde(default = "default_toggle_unread_only")]
+    pub toggle_unread_only: String,
 
     // Preview
     #[serde(default = "default_open_preview")]
@@ -235,6 +237,9 @@ fn default_refresh() -> String {
 fn default_start_search() -> String {
     "/".to_string()
 }
+fn default_toggle_unread_only() -> String {
+    "u".to_string()
+}
 fn default_open_preview() -> String {
     "p".to_string()
 }
@@ -289,6 +294,7 @@ impl Default for Keybindings {
             toggle_favorites_view: default_toggle_favorites_view(),
             refresh: default_refresh(),
             start_search: default_start_search(),
+            toggle_unread_only: default_toggle_unread_only(),
             open_preview: default_open_preview(),
             open_feed_manager: default_open_feed_manager(),
             add_feed: default_add_feed(),
@@ -542,6 +548,8 @@ pub struct App {
     pub feed_health: HashMap<String, FeedHealth>,
     /// Item IDs that have already been seen (for notification tracking)
     seen_items: HashSet<String>,
+    /// Filter to show only unread items
+    pub show_unread_only: bool,
 }
 
 impl Default for App {
@@ -571,6 +579,7 @@ impl Default for App {
             command_buffer: String::new(),
             feed_health: HashMap::new(),
             seen_items: HashSet::new(),
+            show_unread_only: false,
         }
     }
 }
@@ -2195,7 +2204,16 @@ impl App {
 
     /// Updates the search filter based on the current query
     pub fn update_search_filter(&mut self) {
-        if self.search_query.is_empty() {
+        self.apply_filters();
+    }
+
+    /// Applies all active filters (search query and unread-only)
+    fn apply_filters(&mut self) {
+        let has_search = !self.search_query.is_empty();
+        let has_unread_filter = self.show_unread_only;
+
+        // If no filters active, clear filtered_indices
+        if !has_search && !has_unread_filter {
             self.filtered_indices = None;
             self.scroll = 0;
             if !self.current_feed_content.is_empty() {
@@ -2210,8 +2228,15 @@ impl App {
             .iter()
             .enumerate()
             .filter(|(_, item)| {
-                item.title.to_lowercase().contains(&query_lower)
-                    || item.description.to_lowercase().contains(&query_lower)
+                // Apply search filter if active
+                let matches_search = !has_search
+                    || item.title.to_lowercase().contains(&query_lower)
+                    || item.description.to_lowercase().contains(&query_lower);
+
+                // Apply unread filter if active
+                let matches_unread = !has_unread_filter || !self.read_items.contains(&item.id);
+
+                matches_search && matches_unread
             })
             .map(|(i, _)| i)
             .collect();
@@ -2225,14 +2250,21 @@ impl App {
         self.filtered_indices = Some(filtered);
     }
 
-    /// Clears the search filter (used when pressing Esc in normal mode with active filter)
+    /// Toggles the unread-only filter
+    pub fn toggle_unread_only(&mut self) {
+        self.show_unread_only = !self.show_unread_only;
+        self.apply_filters();
+        debug!(
+            "Toggled unread-only filter: {}",
+            if self.show_unread_only { "ON" } else { "OFF" }
+        );
+    }
+
+    /// Clears all filters (search and unread-only) when pressing Esc
     pub fn clear_search(&mut self) {
         self.search_query.clear();
-        self.filtered_indices = None;
-        self.scroll = 0;
-        if !self.current_feed_content.is_empty() {
-            self.selected_index = Some(0);
-        }
+        self.show_unread_only = false;
+        self.apply_filters();
     }
 
     /// Returns the items to display based on the current filter

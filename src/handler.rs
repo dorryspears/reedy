@@ -167,6 +167,8 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 }
             } else if key_matches(&key_event, &kb.start_search) {
                 app.start_search();
+            } else if key_matches(&key_event, &kb.toggle_unread_only) {
+                app.toggle_unread_only();
             } else if key_matches(&key_event, &kb.open_preview) {
                 app.open_preview();
             } else if key_matches(&key_event, &kb.open_feed_manager) {
@@ -365,6 +367,8 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
                 }
             } else if key_matches(&key_event, &kb.start_search) {
                 app.start_search();
+            } else if key_matches(&key_event, &kb.toggle_unread_only) {
+                app.toggle_unread_only();
             } else if key_matches(&key_event, &kb.open_preview) {
                 app.open_preview();
             } else if key_matches(&key_event, &kb.open_in_browser) {
