@@ -733,6 +733,14 @@ impl App {
                         .cloned()
                         .collect();
                     self.current_feed_content = favorites;
+                    // Reset selection state after content change
+                    self.selected_index = if self.current_feed_content.is_empty() {
+                        None
+                    } else {
+                        Some(0)
+                    };
+                    self.filtered_indices = None;
+                    self.scroll = 0;
                     self.last_refresh = Some(SystemTime::now());
                 }
             }
@@ -769,7 +777,9 @@ impl App {
     pub fn get_save_path() -> PathBuf {
         let mut path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
         path.push("reedy");
-        fs::create_dir_all(&path).unwrap_or_default();
+        if let Err(e) = fs::create_dir_all(&path) {
+            error!("Failed to create config directory {:?}: {}", path, e);
+        }
         path.push("feeds.json");
         path
     }
@@ -778,7 +788,9 @@ impl App {
         let mut path = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
         path.push("reedy");
         path.push("logs");
-        fs::create_dir_all(&path).unwrap_or_default();
+        if let Err(e) = fs::create_dir_all(&path) {
+            eprintln!("Failed to create log directory {:?}: {}", path, e);
+        }
         path.push("reedy.log");
         path
     }
@@ -786,7 +798,9 @@ impl App {
     pub fn get_config_path() -> PathBuf {
         let mut path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
         path.push("reedy");
-        fs::create_dir_all(&path).unwrap_or_default();
+        if let Err(e) = fs::create_dir_all(&path) {
+            error!("Failed to create config directory {:?}: {}", path, e);
+        }
         path.push("config.json");
         path
     }
@@ -825,21 +839,26 @@ impl App {
         Ok(())
     }
 
-    fn create_item_id(title: &str, published: Option<SystemTime>) -> String {
+    fn create_item_id(title: &str, published: Option<SystemTime>, feed_url: &str) -> String {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = DefaultHasher::new();
+        feed_url.hash(&mut hasher);
+        let url_hash = hasher.finish();
+
+        let title_slug = title
+            .to_lowercase()
+            .replace(|c: char| !c.is_alphanumeric(), "_");
+
         if let Some(time) = published {
-            format!(
-                "{}_{}",
-                title
-                    .to_lowercase()
-                    .replace(|c: char| !c.is_alphanumeric(), "_"),
-                time.duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs()
-            )
+            let nanos = time
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos();
+            format!("{}_{:x}_{}", title_slug, url_hash, nanos)
         } else {
-            title
-                .to_lowercase()
-                .replace(|c: char| !c.is_alphanumeric(), "_")
+            format!("{}_{:x}", title_slug, url_hash)
         }
     }
 
@@ -1751,6 +1770,7 @@ impl App {
                                     id: Self::create_item_id(
                                         item.title().unwrap_or("No title"),
                                         published,
+                                        &url,
                                     ),
                                     feed_url: url.clone(),
                                 }
@@ -1786,7 +1806,7 @@ impl App {
                                             .map(|l| l.href().to_string())
                                             .unwrap_or_default(),
                                         published,
-                                        id: Self::create_item_id(&entry.title().value, published),
+                                        id: Self::create_item_id(&entry.title().value, published, &url),
                                         feed_url: url.clone(),
                                     }
                                 })
@@ -2381,7 +2401,9 @@ impl App {
         let mut path = dirs::cache_dir().unwrap_or_else(|| PathBuf::from("."));
         path.push("reedy");
         path.push("feed_cache");
-        fs::create_dir_all(&path).unwrap_or_default();
+        if let Err(e) = fs::create_dir_all(&path) {
+            error!("Failed to create cache directory {:?}: {}", path, e);
+        }
         path
     }
 
@@ -2425,8 +2447,9 @@ impl App {
                         "Failed to parse cache file for {}: {}. Removing corrupted cache.",
                         url, e
                     );
-                    if let Err(e) = fs::remove_file(&cache_path) {
-                        error!("Failed to remove corrupted cache file: {}", e);
+                    match fs::remove_file(&cache_path) {
+                        Ok(_) => info!("Removed corrupted cache file for {}", url),
+                        Err(e) => error!("Failed to remove corrupted cache file: {}", e),
                     }
                 }
             }
@@ -2766,17 +2789,9 @@ impl App {
                     // If we're in Favorites view and just unfavorited an item, remove it from the list
                     if was_favorite && self.page_mode == PageMode::Favorites {
                         self.current_feed_content.remove(actual_index);
-                        // Update filtered indices if active
-                        if let Some(ref mut indices) = self.filtered_indices {
-                            // Remove the actual_index from filtered indices and adjust remaining indices
-                            indices.retain(|&i| i != actual_index);
-                            for i in indices.iter_mut() {
-                                if *i > actual_index {
-                                    *i -= 1;
-                                }
-                            }
-                        }
-                        // Adjust selected index
+                        // Rebuild filters to handle all active filter combinations correctly
+                        self.apply_filters();
+                        // Clamp selected index to valid range
                         let visible_count = self.visible_item_count();
                         if visible_count == 0 {
                             self.selected_index = None;
@@ -2891,7 +2906,7 @@ fn convert_rss_items(channel: Channel, feed_title: &str, feed_url: &str) -> Vec<
                 description: clean_description,
                 link: item.link().unwrap_or("").to_string(),
                 published,
-                id: App::create_item_id(item.title().unwrap_or("No title"), published),
+                id: App::create_item_id(item.title().unwrap_or("No title"), published, feed_url),
                 feed_url: feed_url.to_string(),
             }
         })
@@ -2923,7 +2938,7 @@ fn convert_atom_items(feed: AtomFeed, feed_title: &str, feed_url: &str) -> Vec<F
                     .map(|l| l.href().to_string())
                     .unwrap_or_default(),
                 published,
-                id: App::create_item_id(&entry.title().value, published),
+                id: App::create_item_id(&entry.title().value, published, feed_url),
                 feed_url: feed_url.to_string(),
             }
         })
