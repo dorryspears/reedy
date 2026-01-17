@@ -657,8 +657,8 @@ impl App {
             app.current_feed_content = all_items;
 
             // Now refresh feeds (notifications will only fire for truly new items)
+            // This will use cache if valid, only fetching expired feeds
             let _ = app.refresh_all_feeds().await;
-            app.cache_all_feeds().await;
 
             // Reload and combine all cached feed content
             let mut all_items = Vec::new();
@@ -2591,6 +2591,14 @@ impl App {
     /// - Feed parsing fails
     /// - Cache operations fail
     pub async fn refresh_all_feeds(&mut self) -> AppResult<()> {
+        self.refresh_all_feeds_impl(false).await
+    }
+
+    pub async fn force_refresh_all_feeds(&mut self) -> AppResult<()> {
+        self.refresh_all_feeds_impl(true).await
+    }
+
+    async fn refresh_all_feeds_impl(&mut self, force: bool) -> AppResult<()> {
         use std::time::Instant;
 
         let mut all_items = Vec::new();
@@ -2601,7 +2609,16 @@ impl App {
         let feeds: Vec<FeedInfo> = self.rss_feeds.clone();
 
         for feed_info in feeds {
-            debug!("Refreshing feed: {}", feed_info.url);
+            // Check cache first unless forcing refresh
+            if !force {
+                if let Some(cached_items) = self.load_feed_cache(&feed_info.url) {
+                    debug!("Using cached content for {}", feed_info.url);
+                    all_items.extend(cached_items);
+                    continue;
+                }
+            }
+
+            debug!("Fetching feed: {}", feed_info.url);
 
             // Record start time for health tracking
             let start_time = Instant::now();
@@ -2876,22 +2893,13 @@ impl App {
                 // Reset scroll position
                 self.scroll = 0;
 
-                // Reset selection and reload all feeds like at startup
+                // Reload feeds using cache if valid
                 let _ = self.refresh_all_feeds().await;
-                self.cache_all_feeds().await;
-
-                // Load and combine all cached feed content
-                let mut all_items = Vec::new();
-                for feed_info in &self.rss_feeds {
-                    if let Some(cached_items) = self.load_feed_cache(&feed_info.url) {
-                        all_items.extend(cached_items);
-                    }
-                }
-
-                // Sort all items by date, newest first
-                all_items.sort_by(|a, b| b.published.cmp(&a.published));
-                self.current_feed_content = all_items;
-                self.selected_index = Some(0);
+                self.selected_index = if self.current_feed_content.is_empty() {
+                    None
+                } else {
+                    Some(0)
+                };
             }
             _ => {
                 self.page_mode = PageMode::Favorites;

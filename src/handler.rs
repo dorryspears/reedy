@@ -203,7 +203,7 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
             } else if key_matches(&key_event, &kb.scroll_to_bottom) {
                 app.scroll_to_bottom();
             } else if key_matches(&key_event, &kb.refresh) {
-                if let Err(e) = app.refresh_all_feeds().await {
+                if let Err(e) = app.force_refresh_all_feeds().await {
                     error!("Failed to refresh feeds: {}", e);
                     app.error_message = Some(format!("Failed to refresh feeds: {}", e));
                 } else {
