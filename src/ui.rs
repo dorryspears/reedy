@@ -286,11 +286,7 @@ fn render_feed_content(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeC
     };
 
     let list = List::new(items)
-        .block(
-            Block::default()
-                .title(title)
-                .borders(Borders::ALL),
-        )
+        .block(Block::default().title(title).borders(Borders::ALL))
         .style(Style::default().fg(colors.text));
     frame.render_widget(list, area);
 }
@@ -318,14 +314,12 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeC
             Some(cat) => format!("── {} ──", cat),
             None => "── Uncategorized ──".to_string(),
         };
-        items.push(
-            ListItem::new(Line::from(Span::styled(
-                header_text,
-                Style::default()
-                    .fg(colors.category)
-                    .add_modifier(Modifier::BOLD),
-            )))
-        );
+        items.push(ListItem::new(Line::from(Span::styled(
+            header_text,
+            Style::default()
+                .fg(colors.category)
+                .add_modifier(Modifier::BOLD),
+        ))));
 
         // Add feeds in this category
         for feed_info in feeds {
@@ -365,7 +359,9 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeC
 
             // Style for unread count - highlight if there are unread items
             let count_style = if unread_count > 0 {
-                Style::default().fg(colors.highlight).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(colors.highlight)
+                    .add_modifier(Modifier::BOLD)
             } else {
                 Style::default().fg(colors.muted)
             };
@@ -377,7 +373,7 @@ fn render_feed_manager(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeC
                     Span::raw(truncated_title),
                     Span::styled(count_display, count_style),
                 ]))
-                .style(style)
+                .style(style),
             );
             feed_index += 1;
         }
@@ -813,7 +809,11 @@ fn render_article_preview(app: &App, frame: &mut Frame, area: Rect, colors: &The
     let Some(item) = app.get_preview_item() else {
         // Should not happen, but render empty if no item
         let paragraph = Paragraph::new("No article selected")
-            .block(Block::default().title("Article Preview").borders(Borders::ALL))
+            .block(
+                Block::default()
+                    .title("Article Preview")
+                    .borders(Borders::ALL),
+            )
             .style(Style::default().fg(colors.description));
         frame.render_widget(paragraph, area);
         return;
@@ -870,8 +870,16 @@ fn render_article_preview(app: &App, frame: &mut Frame, area: Rect, colors: &The
     // Read/Favorite status
     let status = format!(
         "Status: {}{}",
-        if app.is_item_read(item) { "[Read] " } else { "[Unread] " },
-        if app.is_item_favorite(item) { "★ Favorite" } else { "" }
+        if app.is_item_read(item) {
+            "[Read] "
+        } else {
+            "[Unread] "
+        },
+        if app.is_item_favorite(item) {
+            "★ Favorite"
+        } else {
+            ""
+        }
     );
     lines.push(Line::from(vec![Span::styled(
         status,
@@ -906,11 +914,7 @@ fn render_article_preview(app: &App, frame: &mut Frame, area: Rect, colors: &The
 
     // Build the title with scroll indicator
     let title = if total_lines > visible_height {
-        format!(
-            "Article Preview (Line {}/{})",
-            scroll + 1,
-            total_lines
-        )
+        format!("Article Preview (Line {}/{})", scroll + 1, total_lines)
     } else {
         "Article Preview".to_string()
     };
@@ -1005,7 +1009,10 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
     } else if app.input_mode == InputMode::Preview {
         "[↑↓/jk] Scroll  [PgUp/PgDn] Page  [o/O] Open/Copy  [r] Read  [f] Fav  [s] Copy  [S] Save  [Esc/q/p] Close".to_string()
     } else if app.input_mode == InputMode::Searching {
-        format!("Search: {}█  [Enter] Confirm  [Esc] Cancel", app.search_query)
+        format!(
+            "Search: {}█  [Enter] Confirm  [Esc] Cancel",
+            app.search_query
+        )
     } else if app.input_mode == InputMode::Command {
         format!(":{}█  [Enter] Execute  [Esc] Cancel", app.command_buffer)
     } else {
@@ -1055,11 +1062,16 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
         Line::from(vec![
             Span::styled(
                 format!(" {} ", status),
-                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled(" | ", Style::default().fg(colors.muted)),
             Span::styled(
-                truncate_text(&commands, area.width.saturating_sub(status.len() as u16 + 8)),
+                truncate_text(
+                    &commands,
+                    area.width.saturating_sub(status.len() as u16 + 8),
+                ),
                 Style::default().fg(colors.secondary),
             ),
         ])
@@ -1068,7 +1080,9 @@ fn render_command_bar(app: &App, frame: &mut Frame, area: Rect, colors: &ThemeCo
         Line::from(vec![
             Span::styled(
                 format!(" {} ", error),
-                Style::default().fg(colors.error).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(colors.error)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled(" | ", Style::default().fg(colors.muted)),
             Span::styled(

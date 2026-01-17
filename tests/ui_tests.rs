@@ -1,5 +1,5 @@
-use reedy::ui::{parse_color, truncate_text};
 use ratatui::style::Color;
+use reedy::ui::{parse_color, truncate_text};
 
 #[test]
 fn test_truncate_text_no_truncation_needed() {

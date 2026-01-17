@@ -743,7 +743,11 @@ async fn test_opml_import_empty_content() {
 
     // Should report no feeds found
     assert!(app.error_message.is_some());
-    assert!(app.error_message.as_ref().unwrap().contains("No feeds found"));
+    assert!(app
+        .error_message
+        .as_ref()
+        .unwrap()
+        .contains("No feeds found"));
 }
 
 #[tokio::test]
@@ -838,7 +842,11 @@ fn test_export_opml_empty_feeds() {
     let result = app.export_opml();
     assert!(result.is_err());
     assert!(app.error_message.is_some());
-    assert!(app.error_message.as_ref().unwrap().contains("No feeds to export"));
+    assert!(app
+        .error_message
+        .as_ref()
+        .unwrap()
+        .contains("No feeds to export"));
 }
 
 // Keybindings tests
@@ -1289,5 +1297,3 @@ fn test_select_next_does_not_mark_read_in_feed_manager() {
     // No items should be marked as read (we're in FeedManager mode)
     assert!(!app.is_item_read(&item1));
 }
-
-

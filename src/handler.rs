@@ -1,5 +1,5 @@
 use crate::app::{App, AppResult, InputMode, Keybindings, PageMode};
-use crossterm::event::{KeyCode, KeyEvent, MouseEvent, MouseEventKind, MouseButton};
+use crossterm::event::{KeyCode, KeyEvent, MouseButton, MouseEvent, MouseEventKind};
 use log::{debug, error};
 
 /// Parses a key string (like "Enter", "k", "Up", "PageDown") into a KeyCode.
@@ -414,8 +414,11 @@ pub async fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<
 pub async fn handle_mouse_events(mouse_event: MouseEvent, app: &mut App) -> AppResult<()> {
     // Ignore mouse events in text input modes
     match app.input_mode {
-        InputMode::Adding | InputMode::Importing | InputMode::Searching
-        | InputMode::SettingCategory | InputMode::Command => {
+        InputMode::Adding
+        | InputMode::Importing
+        | InputMode::Searching
+        | InputMode::SettingCategory
+        | InputMode::Command => {
             return Ok(());
         }
         _ => {}
@@ -488,18 +491,22 @@ async fn handle_mouse_click(row: u16, app: &mut App) -> AppResult<()> {
                     let feeds_by_category = app.get_feeds_by_category();
                     let mut current_row: u16 = 0;
                     let mut feed_index = 0;
-                    let scroll_offset = app.scroll as u16;
+                    let scroll_offset = app.scroll;
 
                     'outer: for (_, feeds) in &feeds_by_category {
                         // Category header takes 1 line
-                        if current_row >= scroll_offset && current_row - scroll_offset == content_row {
+                        if current_row >= scroll_offset
+                            && current_row - scroll_offset == content_row
+                        {
                             // Clicked on a category header - do nothing
                             break;
                         }
                         current_row += 1;
 
                         for _ in feeds {
-                            if current_row >= scroll_offset && current_row - scroll_offset == content_row {
+                            if current_row >= scroll_offset
+                                && current_row - scroll_offset == content_row
+                            {
                                 // Clicked on a feed item
                                 if feed_index < app.rss_feeds.len() {
                                     if Some(feed_index) == app.selected_index {

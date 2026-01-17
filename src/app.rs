@@ -10,7 +10,10 @@ use reqwest;
 use rss::Channel;
 use serde::{Deserialize, Serialize};
 use std::io::{Cursor, Write};
-use std::{collections::HashMap, collections::HashSet, error, fs, path::PathBuf, time::Duration, time::SystemTime};
+use std::{
+    collections::HashMap, collections::HashSet, error, fs, path::PathBuf, time::Duration,
+    time::SystemTime,
+};
 
 /// Default HTTP request timeout in seconds
 const DEFAULT_HTTP_TIMEOUT_SECS: u64 = 30;
@@ -497,10 +500,10 @@ impl FeedHealth {
     /// Returns a display string for the health status
     pub fn status_indicator(&self) -> &'static str {
         match self.status {
-            FeedStatus::Healthy => "●",  // Green dot
-            FeedStatus::Slow => "◐",     // Half-filled circle (slow)
-            FeedStatus::Broken => "✗",   // X mark (broken)
-            FeedStatus::Unknown => "○",   // Empty circle (unknown)
+            FeedStatus::Healthy => "●", // Green dot
+            FeedStatus::Slow => "◐",    // Half-filled circle (slow)
+            FeedStatus::Broken => "✗",  // X mark (broken)
+            FeedStatus::Unknown => "○", // Empty circle (unknown)
         }
     }
 
@@ -694,7 +697,10 @@ impl App {
             if let Ok(elapsed) = last_refresh.elapsed() {
                 let refresh_interval = Duration::from_secs(self.config.auto_refresh_mins * 60);
                 if elapsed >= refresh_interval {
-                    debug!("Auto-refresh triggered after {} minutes", self.config.auto_refresh_mins);
+                    debug!(
+                        "Auto-refresh triggered after {} minutes",
+                        self.config.auto_refresh_mins
+                    );
                     self.auto_refresh_pending = true;
                 }
             }
@@ -965,7 +971,8 @@ impl App {
                         error!("Failed to remove corrupted file: {}", e);
                     }
                     self.error_message = Some(
-                        "Feeds data was corrupted and has been cleared. Starting fresh.".to_string(),
+                        "Feeds data was corrupted and has been cleared. Starting fresh."
+                            .to_string(),
                     );
                     return Ok(());
                 }
@@ -1201,7 +1208,10 @@ impl App {
         match copy_to_clipboard_osc52(&feed_list) {
             Ok(()) => {
                 info!("Exported {} feeds to clipboard", self.rss_feeds.len());
-                self.status_message = Some(format!("Exported {} feeds to clipboard", self.rss_feeds.len()));
+                self.status_message = Some(format!(
+                    "Exported {} feeds to clipboard",
+                    self.rss_feeds.len()
+                ));
             }
             Err(e) => {
                 error!("Failed to copy to clipboard: {}", e);
@@ -1250,8 +1260,16 @@ impl App {
 
         fs::write(&path, opml_content)?;
 
-        info!("Exported {} feeds to OPML: {}", self.rss_feeds.len(), path.display());
-        self.error_message = Some(format!("Exported {} feeds to {}", self.rss_feeds.len(), path.display()));
+        info!(
+            "Exported {} feeds to OPML: {}",
+            self.rss_feeds.len(),
+            path.display()
+        );
+        self.error_message = Some(format!(
+            "Exported {} feeds to {}",
+            self.rss_feeds.len(),
+            path.display()
+        ));
 
         Ok(path)
     }
@@ -1370,7 +1388,9 @@ impl App {
                         if self.rss_feeds.iter().any(|f| f.url == url) {
                             skipped_duplicate += 1;
                         } else {
-                            let feed_title = title.filter(|t| !t.is_empty()).unwrap_or_else(|| url.clone());
+                            let feed_title = title
+                                .filter(|t| !t.is_empty())
+                                .unwrap_or_else(|| url.clone());
                             let category = category_stack.last().cloned();
                             info!("Adding feed from OPML: {} ({})", feed_title, url);
                             self.rss_feeds.push(FeedInfo {
@@ -1412,7 +1432,9 @@ impl App {
                         }
 
                         // Use the title from OPML or use the URL as fallback
-                        let feed_title = title.filter(|t| !t.is_empty()).unwrap_or_else(|| url.clone());
+                        let feed_title = title
+                            .filter(|t| !t.is_empty())
+                            .unwrap_or_else(|| url.clone());
                         let category = category_stack.last().cloned();
 
                         info!("Adding feed from OPML: {} ({})", feed_title, url);
@@ -1532,10 +1554,7 @@ impl App {
         let mut grouped: BTreeMap<Option<String>, Vec<&FeedInfo>> = BTreeMap::new();
 
         for feed in &self.rss_feeds {
-            grouped
-                .entry(feed.category.clone())
-                .or_insert_with(Vec::new)
-                .push(feed);
+            grouped.entry(feed.category.clone()).or_default().push(feed);
         }
 
         // Convert to Vec and sort: None (uncategorized) first, then alphabetically by category
@@ -1578,7 +1597,11 @@ impl App {
             match Self::validate_and_get_feed_title(&url, self.config.http_timeout_secs).await {
                 Ok(Some(title)) => {
                     info!("Successfully validated and added feed: {} ({})", title, url);
-                    self.rss_feeds.push(FeedInfo { url, title, category: None });
+                    self.rss_feeds.push(FeedInfo {
+                        url,
+                        title,
+                        category: None,
+                    });
                     added += 1;
                 }
                 Ok(None) => {
@@ -1676,7 +1699,10 @@ impl App {
             .await
         {
             Ok(Some(title)) => {
-                info!("Successfully validated feed: {} ({})", title, self.input_buffer);
+                info!(
+                    "Successfully validated feed: {} ({})",
+                    title, self.input_buffer
+                );
                 self.rss_feeds.push(FeedInfo {
                     url: self.input_buffer.clone(),
                     title,
@@ -1732,7 +1758,10 @@ impl App {
                     self.error_message = Some(format!(
                         "HTTP error {}: {}",
                         response.status(),
-                        response.status().canonical_reason().unwrap_or("Unknown error")
+                        response
+                            .status()
+                            .canonical_reason()
+                            .unwrap_or("Unknown error")
                     ));
                     return Ok(());
                 }
@@ -1770,7 +1799,7 @@ impl App {
                                     id: Self::create_item_id(
                                         item.title().unwrap_or("No title"),
                                         published,
-                                        &url,
+                                        url,
                                     ),
                                     feed_url: url.clone(),
                                 }
@@ -1798,7 +1827,11 @@ impl App {
                                         .map(|date| date.to_owned().into());
 
                                     FeedItem {
-                                        title: format!("{} | {}", entry.title().value, feed_title_clone),
+                                        title: format!(
+                                            "{} | {}",
+                                            entry.title().value,
+                                            feed_title_clone
+                                        ),
                                         description: clean_description,
                                         link: entry
                                             .links()
@@ -1806,7 +1839,11 @@ impl App {
                                             .map(|l| l.href().to_string())
                                             .unwrap_or_default(),
                                         published,
-                                        id: Self::create_item_id(&entry.title().value, published, &url),
+                                        id: Self::create_item_id(
+                                            &entry.title().value,
+                                            published,
+                                            url,
+                                        ),
                                         feed_url: url.clone(),
                                     }
                                 })
@@ -1957,7 +1994,9 @@ impl App {
         let max_scroll = if list_len == 0 {
             0
         } else {
-            list_len.saturating_sub(1).saturating_sub(page_size.saturating_sub(1))
+            list_len
+                .saturating_sub(1)
+                .saturating_sub(page_size.saturating_sub(1))
         };
 
         // Calculate new scroll position, capped at maximum scroll
@@ -2144,7 +2183,13 @@ impl App {
             .title
             .chars()
             .take(50)
-            .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == ' ' || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect::<String>()
             .trim()
             .replace(' ', "_");
@@ -2367,11 +2412,7 @@ impl App {
                 .iter()
                 .map(|&i| (i, &self.current_feed_content[i]))
                 .collect(),
-            None => self
-                .current_feed_content
-                .iter()
-                .enumerate()
-                .collect(),
+            None => self.current_feed_content.iter().enumerate().collect(),
         }
     }
 
@@ -2504,11 +2545,15 @@ impl App {
                     if let Ok(content) = response.bytes().await {
                         // Try RSS first
                         let feed_items = match Channel::read_from(&content[..]) {
-                            Ok(channel) => convert_rss_items(channel, &feed_info.title, &feed_info.url),
+                            Ok(channel) => {
+                                convert_rss_items(channel, &feed_info.title, &feed_info.url)
+                            }
                             Err(_) => {
                                 // Try Atom if RSS fails
                                 match AtomFeed::read_from(&content[..]) {
-                                    Ok(feed) => convert_atom_items(feed, &feed_info.title, &feed_info.url),
+                                    Ok(feed) => {
+                                        convert_atom_items(feed, &feed_info.title, &feed_info.url)
+                                    }
                                     Err(e) => {
                                         error!("Failed to parse feed as either RSS or Atom: {}", e);
                                         continue;
@@ -2592,11 +2637,19 @@ impl App {
                         Ok(content) => {
                             // Try RSS first
                             let parse_result = match Channel::read_from(&content[..]) {
-                                Ok(channel) => Some(convert_rss_items(channel, &feed_info.title, &feed_info.url)),
+                                Ok(channel) => Some(convert_rss_items(
+                                    channel,
+                                    &feed_info.title,
+                                    &feed_info.url,
+                                )),
                                 Err(_) => {
                                     // Try Atom if RSS fails
                                     match AtomFeed::read_from(&content[..]) {
-                                        Ok(feed) => Some(convert_atom_items(feed, &feed_info.title, &feed_info.url)),
+                                        Ok(feed) => Some(convert_atom_items(
+                                            feed,
+                                            &feed_info.title,
+                                            &feed_info.url,
+                                        )),
                                         Err(_) => None,
                                     }
                                 }
@@ -2605,8 +2658,13 @@ impl App {
                             match parse_result {
                                 Some(feed_items) => {
                                     // Save to cache
-                                    if let Err(e) = self.save_feed_cache(&feed_info.url, &feed_items) {
-                                        error!("Failed to cache feed content for {}: {}", feed_info.url, e);
+                                    if let Err(e) =
+                                        self.save_feed_cache(&feed_info.url, &feed_items)
+                                    {
+                                        error!(
+                                            "Failed to cache feed content for {}: {}",
+                                            feed_info.url, e
+                                        );
                                     }
                                     all_items.extend(feed_items);
 
@@ -2617,19 +2675,26 @@ impl App {
                                         FeedStatus::Healthy
                                     };
 
-                                    self.feed_health.insert(feed_info.url.clone(), FeedHealth {
-                                        status,
-                                        last_success: Some(SystemTime::now()),
-                                        last_response_time_ms: Some(response_time_ms),
-                                        last_error: None,
-                                        consecutive_failures: 0,
-                                    });
+                                    self.feed_health.insert(
+                                        feed_info.url.clone(),
+                                        FeedHealth {
+                                            status,
+                                            last_success: Some(SystemTime::now()),
+                                            last_response_time_ms: Some(response_time_ms),
+                                            last_error: None,
+                                            consecutive_failures: 0,
+                                        },
+                                    );
                                 }
                                 None => {
-                                    error!("Failed to parse feed as either RSS or Atom: {}", feed_info.url);
+                                    error!(
+                                        "Failed to parse feed as either RSS or Atom: {}",
+                                        feed_info.url
+                                    );
 
                                     // Update health status as broken (parse error)
-                                    let health = self.feed_health.entry(feed_info.url.clone()).or_default();
+                                    let health =
+                                        self.feed_health.entry(feed_info.url.clone()).or_default();
                                     health.status = FeedStatus::Broken;
                                     health.last_error = Some("Failed to parse feed".to_string());
                                     health.last_response_time_ms = Some(response_time_ms);
@@ -2858,7 +2923,12 @@ pub async fn fetch_feed(url: &str, timeout_secs: Option<u64>) -> AppResult<Vec<F
 
     // Check for HTTP errors
     if !resp.status().is_success() {
-        return Err(format!("HTTP error {}: {}", resp.status(), resp.status().canonical_reason().unwrap_or("Unknown")).into());
+        return Err(format!(
+            "HTTP error {}: {}",
+            resp.status(),
+            resp.status().canonical_reason().unwrap_or("Unknown")
+        )
+        .into());
     }
 
     let response = resp.bytes().await?;
